@@ -1,100 +1,21 @@
 #include "LogProcessor.hpp"
-#include <iostream>
+#include "LogEntry.hpp"
+
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
-#include <vector>
-#include <algorithm>
-#include <numeric>
-#include <regex>
+#include <map>
+#include <nlohmann/json.hpp> // Requires nlohmann/json header file
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
-// Helper: Calculate statistics
-void print_statistics(const std::vector<double>& numbers) {
-    if (numbers.empty()) {
-        std::cout << "No numeric data found.\n";
-        return;
-    }
-    double sum = std::accumulate(numbers.begin(), numbers.end(), 0.0);
-    double avg = sum / numbers.size();
-    double min = *std::min_element(numbers.begin(), numbers.end());
-    double max = *std::max_element(numbers.begin(), numbers.end());
-    std::vector<double> sorted = numbers;
-    std::sort(sorted.begin(), sorted.end());
-    double median = sorted.size() % 2 == 0 ?
-        (sorted[sorted.size()/2 - 1] + sorted[sorted.size()/2]) / 2.0 :
-        sorted[sorted.size()/2];
+// Constructor
+LogProcessor::LogProcessor(const std::string& log_dir)
+    : log_dir_(log_dir) {}
 
-    std::cout << "Count: " << numbers.size() << "\n";
-    std::cout << "Average: " << avg << "\n";
-    std::cout << "Min: " << min << "\n";
-    std::cout << "Max: " << max << "\n";
-    std::cout << "Median: " << median << "\n";
-}
-
-// Helper: Try to extract a number from a string
-bool extract_number(const std::string& token, double& number) {
-    try {
-        size_t idx;
-        number = std::stod(token, &idx);
-        return idx == token.size();
-    } catch (...) {
-        return false;
-    }
-}
-
-// CSV parser
-std::vector<double> parse_csv(const std::string& filepath) {
-    std::vector<double> numbers;
-    std::ifstream file(filepath);
-    std::string line;
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string cell;
-        while (std::getline(ss, cell, ',')) {
-            double num;
-            if (extract_number(cell, num)) {
-                numbers.push_back(num);
-            }
-        }
-    }
-    return numbers;
-}
-
-// Plain text parser (numbers separated by whitespace)
-std::vector<double> parse_plain(const std::string& filepath) {
-    std::vector<double> numbers;
-    std::ifstream file(filepath);
-    std::string token;
-    while (file >> token) {
-        double num;
-        if (extract_number(token, num)) {
-            numbers.push_back(num);
-        }
-    }
-    return numbers;
-}
-
-// JSON parser (very basic, looks for numbers in the file)
-std::vector<double> parse_json(const std::string& filepath) {
-    std::vector<double> numbers;
-    std::ifstream file(filepath);
-    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    std::regex num_regex(R"([-+]?\d*\.?\d+([eE][-+]?\d+)?)");
-    auto nums_begin = std::sregex_iterator(content.begin(), content.end(), num_regex);
-    auto nums_end = std::sregex_iterator();
-    for (auto it = nums_begin; it != nums_end; ++it) {
-        double num;
-        if (extract_number(it->str(), num)) {
-            numbers.push_back(num);
-        }
-    }
-    return numbers;
-}
-
-LogProcessor::LogProcessor(const std::string& log_dir) : log_dir_(log_dir) {}
-
+// Helper: List files in the log directory
 std::vector<std::string> LogProcessor::get_log_files() {
     std::vector<std::string> files;
     for (const auto& entry : fs::directory_iterator(log_dir_)) {
@@ -105,23 +26,194 @@ std::vector<std::string> LogProcessor::get_log_files() {
     return files;
 }
 
-void LogProcessor::process_log_file(const std::string& filepath) {
-    std::cout << "Processing file: " << filepath << std::endl;
-    std::vector<double> numbers;
-    if (filepath.size() >= 4 && filepath.compare(filepath.size() - 4, 4, ".csv") == 0) {
-        numbers = parse_csv(filepath);
-    } else if (filepath.size() >= 5 && filepath.compare(filepath.size() - 5, 5, ".json") == 0) {
-        numbers = parse_json(filepath);
-    } else {
-        numbers = parse_plain(filepath);
+// Helper: Parse TXT/CSV logs
+std::vector<LogEntry> LogProcessor::parse_txt(const std::string& filepath) {
+    std::vector<LogEntry> entries;
+    std::ifstream file(filepath);
+    std::string line;
+
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string user, ip, level, timestamp;
+
+        std::getline(ss, user, ',');
+        std::getline(ss, ip, ',');
+        std::getline(ss, level, ',');
+        std::getline(ss, timestamp, ',');
+
+        LogEntry entry{user, ip, level, timestamp};
+        if (entry.parse_timestamp()) {
+            entries.push_back(entry);
+        }
     }
-    print_statistics(numbers);
+    return entries;
 }
 
-void LogProcessor::process_logs() {
+#include "json.hpp" // Make sure this is at the top
+
+using json = nlohmann::json;
+
+std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
+    std::vector<LogEntry> entries;
+    std::ifstream file(filepath);
+    json j;
+
+    try {
+        file >> j;
+
+        // Optional: check the structure
+        if (!j.contains("logs") || !j["logs"].is_array()) {
+            std::cerr << "Invalid JSON structure in: " << filepath << "\n";
+            return entries;
+        }
+
+        for (const auto& log : j["logs"]) {
+            if (log.contains("user") && log.contains("ip") && log.contains("level") && log.contains("timestamp")) {
+                LogEntry entry;
+                entry.user = log["user"].get<std::string>();
+                entry.ip = log["ip"].get<std::string>();
+                entry.level = log["level"].get<std::string>();
+                entry.timestamp = log["timestamp"].get<std::string>();
+
+                if (entry.parse_timestamp()) {
+                    entries.push_back(entry);
+                }
+            } else {
+                std::cerr << "Skipping incomplete log entry.\n";
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing JSON file " << filepath << ": " << e.what() << "\n";
+    }
+
+    return entries;
+}
+
+
+// TODO: XML parser placeholder
+std::vector<LogEntry> LogProcessor::parse_xml(const std::string& filepath) {
+    std::cerr << "XML parsing not implemented yet: " << filepath << std::endl;
+    return {};
+}
+
+// Analyze entries (by user, IP, level)
+void LogProcessor::analyze(const std::vector<LogEntry>& entries) {
+    std::map<std::string, int> by_user;
+    std::map<std::string, int> by_ip;
+    std::map<std::string, int> by_level;
+
+    for (const auto& e : entries) {
+        by_user[e.user]++;
+        by_ip[e.ip]++;
+        by_level[e.level]++;
+    }
+
+    std::cout << "\n--- Log Attempts by User ---\n";
+    for (const auto& [user, count] : by_user) {
+        std::cout << user << ": " << count << "\n";
+    }
+
+    std::cout << "\n--- Log Attempts by IP ---\n";
+    for (const auto& [ip, count] : by_ip) {
+        std::cout << ip << ": " << count << "\n";
+    }
+
+    std::cout << "\n--- Log Attempts by Level ---\n";
+    for (const auto& [level, count] : by_level) {
+        std::cout << level << ": " << count << "\n";
+    }
+}
+
+// Main processing method
+void LogProcessor::process_logs(std::optional<DateRange> range) {
+    std::vector<LogEntry> all_entries;
+
     auto files = get_log_files();
     for (const auto& file : files) {
-        process_log_file(file);
-        std::cout << "-----------------------------\n";
+        std::vector<LogEntry> entries;
+
+        if (file.ends_with(".json")) {
+            entries = parse_json(file);
+        } else if (file.ends_with(".xml")) {
+            entries = parse_xml(file);
+        } else {
+            entries = parse_txt(file);
+        }
+
+        for (auto& e : entries) {
+            if (!range || range->contains(e.parsed_time)) {
+                all_entries.push_back(e);
+            }
+        }
     }
+
+    if (all_entries.empty()) {
+        std::cout << "No valid log entries found.\n";
+    } else {
+        analyze(all_entries);
+    }
+}
+
+std::vector<LogEntry> LogProcessor::collect_logs(std::optional<DateRange> range) {
+    std::vector<LogEntry> all_entries;
+
+    auto files = get_log_files();
+    for (const auto& file : files) {
+        std::vector<LogEntry> entries;
+
+        if (file.ends_with(".json")) {
+            entries = parse_json(file);
+        } else if (file.ends_with(".xml")) {
+            entries = parse_xml(file);  // You can stub this for now
+        } else {
+            entries = parse_txt(file);
+        }
+
+        for (auto& e : entries) {
+            if (!range || range->contains(e.parsed_time)) {
+                all_entries.push_back(e);
+            }
+        }
+    }
+
+    return all_entries;
+}
+
+nlohmann::json LogProcessor::analyze_by_user(const std::vector<LogEntry>& entries) {
+    std::map<std::string, int> counts;
+    for (const auto& e : entries) {
+        counts[e.user]++;
+    }
+
+    nlohmann::json result;
+    for (const auto& [user, count] : counts) {
+        result[user] = count;
+    }
+    return result;
+}
+
+nlohmann::json LogProcessor::analyze_by_ip(const std::vector<LogEntry>& entries) {
+    std::map<std::string, int> counts;
+    for (const auto& e : entries) {
+        counts[e.ip]++;
+    }
+
+    nlohmann::json result;
+    for (const auto& [ip, count] : counts) {
+        result[ip] = count;
+    }
+    return result;
+}
+
+nlohmann::json LogProcessor::analyze_by_level(const std::vector<LogEntry>& entries) {
+    std::map<std::string, int> counts;
+    for (const auto& e : entries) {
+        counts[e.level]++;
+    }
+
+    nlohmann::json result;
+    for (const auto& [level, count] : counts) {
+        result[level] = count;
+    }
+    return result;
 }

@@ -1,117 +1,77 @@
 #include "TCPServer.hpp"
+#include "LogProcessor.hpp"
+#include "json.hpp"
+
 #include <iostream>
 #include <thread>
 #include <vector>
 #include <mutex>
 #include <atomic>
 #include <algorithm>
-
-std::mutex cout_mutex;
-std::atomic<bool> server_running(true); // Atomic flag for graceful shutdown
-
-TCPServer::TCPServer(int port) : port_(port), server_socket_(INVALID_SOCKET) {}
-
-TCPServer::~TCPServer() {
-    if (server_socket_ != INVALID_SOCKET) closesocket(server_socket_);
-    WSACleanup();
-}
+#include <sstream>
 
 void TCPServer::handle_client(SOCKET client_socket) {
-    char buffer[1024];
-    int bytesReceived;
+    char buffer[8192];
+    int bytesReceived = recv(client_socket, buffer, sizeof(buffer), 0);
 
-    while ((bytesReceived = recv(client_socket, buffer, sizeof(buffer), 0)) > 0) {
-        {
-            std::lock_guard<std::mutex> lock(cout_mutex);
-            std::cout << "Received: " << std::string(buffer, bytesReceived) << std::endl;
-        }
-
-        // Echo the message back to the client
-        if (send(client_socket, buffer, bytesReceived, 0) == SOCKET_ERROR) {
-            std::cerr << "ERROR: Failed to send data to client." << std::endl;
-            break;
-        }
+    if (bytesReceived <= 0) {
+        std::cerr << "ERROR: Failed to receive data from client." << std::endl;
+        closesocket(client_socket);
+        return;
     }
 
-    if (bytesReceived == SOCKET_ERROR) {
-        std::cerr << "ERROR: Failed to receive data from client." << std::endl;
+    std::string request_str(buffer, bytesReceived);
+    {
+        std::lock_guard<std::mutex> lock(cout_mutex);
+        std::cout << "Received request:\n" << request_str << std::endl;
+    }
+
+    try {
+        using json = nlohmann::json;
+        json request = json::parse(request_str);
+
+        std::string analysis_type = request["analysis_type"];
+        std::string log_folder = request["log_folder"];
+
+        // Parse date range
+        std::string start_date = request.value("start_date", "");
+        std::string end_date = request.value("end_date", "");
+
+        std::optional<DateRange> date_range = std::nullopt;
+        if (!start_date.empty() && !end_date.empty()) {
+            std::tm tm_start = {}, tm_end = {};
+            std::istringstream ss1(start_date), ss2(end_date);
+            ss1 >> std::get_time(&tm_start, "%Y-%m-%d %H:%M:%S");
+            ss2 >> std::get_time(&tm_end, "%Y-%m-%d %H:%M:%S");
+
+            auto start_tp = std::chrono::system_clock::from_time_t(std::mktime(&tm_start));
+            auto end_tp = std::chrono::system_clock::from_time_t(std::mktime(&tm_end));
+            date_range = DateRange{start_tp, end_tp};
+        }
+
+        // Process logs
+        LogProcessor processor(log_folder);
+        std::vector<LogEntry> all_logs = processor.collect_logs(date_range);
+
+        // Build JSON response
+        json response;
+
+        if (analysis_type == "user") {
+            response["user"] = processor.analyze_by_user(all_logs);
+        } else if (analysis_type == "ip") {
+            response["ip"] = processor.analyze_by_ip(all_logs);
+        } else if (analysis_type == "level") {
+            response["level"] = processor.analyze_by_level(all_logs);
+        } else {
+            response["error"] = "Unknown analysis type.";
+        }
+
+        std::string response_str = response.dump();
+        send(client_socket, response_str.c_str(), static_cast<int>(response_str.size()), 0);
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error processing request: " << e.what() << std::endl;
     }
 
     closesocket(client_socket);
-}
-
-void TCPServer::start() {
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cerr << "ERROR: WSAStartup failed." << std::endl;
-        return;
-    }
-
-    server_socket_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket_ == INVALID_SOCKET) {
-        std::cerr << "ERROR: Failed to create socket." << std::endl;
-        WSACleanup();
-        return;
-    }
-
-    sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port_);
-
-    if (bind(server_socket_, (sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
-        std::cerr << "ERROR: Failed to bind socket." << std::endl;
-        closesocket(server_socket_);
-        WSACleanup();
-        return;
-    }
-
-    if (listen(server_socket_, SOMAXCONN) == SOCKET_ERROR) {
-        std::cerr << "ERROR: Failed to listen on socket." << std::endl;
-        closesocket(server_socket_);
-        WSACleanup();
-        return;
-    }
-
-    std::vector<std::thread> threads;
-
-    std::cout << "Server listening on port " << port_ << "..." << std::endl;
-
-    while (server_running) {
-        SOCKET client_socket = accept(server_socket_, nullptr, nullptr);
-        if (client_socket == INVALID_SOCKET) {
-            if (server_running) {
-                std::cerr << "ERROR: Failed to accept client connection." << std::endl;
-            }
-            break;
-        }
-
-        // Launch a new thread to handle the client
-        threads.emplace_back(&TCPServer::handle_client, this, client_socket);
-
-        // Clean up finished threads
-        threads.erase(std::remove_if(threads.begin(), threads.end(),
-                                     [](std::thread& t) {
-                                         if (t.joinable()) {
-                                             t.join();
-                                             return true;
-                                         }
-                                         return false;
-                                     }),
-                      threads.end());
-    }
-
-    // Join all remaining threads before exiting
-    for (auto& t : threads) {
-        if (t.joinable()) {
-            t.join();
-        }
-    }
-
-    std::cout << "Server shutting down..." << std::endl;
-}
-
-void TCPServer::stop() {
-    server_running = false;
-    closesocket(server_socket_); // Force accept() to return
 }
