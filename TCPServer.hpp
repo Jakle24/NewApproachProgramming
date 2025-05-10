@@ -6,6 +6,7 @@ public:
     TCPServer(int port);
     ~TCPServer();
     void start();
+    void stop();
 
 private:
     int port_;
