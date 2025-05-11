@@ -1,12 +1,12 @@
 #include "LogProcessor.hpp"
 #include "LogEntry.hpp"
-
+#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <map>
-#include <nlohmann/json.hpp> // Requires nlohmann/json header file
+
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -48,8 +48,6 @@ std::vector<LogEntry> LogProcessor::parse_txt(const std::string& filepath) {
     }
     return entries;
 }
-
-#include "json.hpp" // Make sure this is at the top
 
 using json = nlohmann::json;
 

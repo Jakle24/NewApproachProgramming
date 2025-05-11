@@ -1,7 +1,6 @@
 #include "TCPServer.hpp"
 #include "LogProcessor.hpp"
-#include "json.hpp"
-
+#include <nlohmann/json.hpp>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -9,6 +8,8 @@
 #include <atomic>
 #include <algorithm>
 #include <sstream>
+#include <mutex>
+std::mutex cout_mutex;
 
 void TCPServer::handle_client(SOCKET client_socket) {
     char buffer[8192];

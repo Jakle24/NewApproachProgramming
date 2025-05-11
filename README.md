@@ -206,27 +206,27 @@ Final Checklist:
 
 
 
-## How to Run
+🛠️ Setup Instructions
+1. Download & Prepare Log Files
+Place your LogFiles.zip in the root of the project directory (next to extract_logs.bat).
 
-1. **Extract Log Files**
-   - Place `LogFiles.zip` in the project root directory.
-   - Extract it to a folder named `LogFiles` (right-click > Extract All… or use the provided `extract_logs.bat`).
+Run extract_logs.bat (or just run the program — it will auto-extract if needed).
 
-2. **Build the Project**
-   - Use CMake or your IDE to build the project (see Build Instructions above).
+2. Build the Project (Windows – Manual Compile)
+If you’re using the Visual Studio Developer Command Prompt:
 
-3. **Run the Program**
-   - Open a terminal in the build output directory.
-   - Run the executable:
-     ```
-     .\NewApproachProgramming.exe
-     ```
-   - When prompted:
-     - Enter `1` to start the **Server** (for networked log processing).
-     - Enter `3` to start the **Log Processor** (standalone log analysis; enter `LogFiles` as the directory when prompted).
+cmd
+Copy
+Edit
+cl /EHsc /std:c++17 src\*.cpp ws2_32.lib /I.\nlohmann /Fe:NewApproachProgramming.exe
+This will generate NewApproachProgramming.exe.
 
-4. **Client Usage**
-   - Start another instance and enter `2` to run the **Client**.
-   - Connect to the server and interact as needed.
+3. Run the App
+You can now launch the program in one of three modes:
 
----
+bash
+Copy
+Edit
+NewApproachProgramming.exe server     # Start the server
+NewApproachProgramming.exe client     # Start the client and send requests
+NewApproachProgramming.exe process    # Run log analysis locally (no network)

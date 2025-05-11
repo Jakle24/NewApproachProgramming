@@ -1,5 +1,6 @@
 #include "TCPServer.hpp"
 #include "TCPClient.hpp"
+#include <nlohmann/json.hpp> // Ensure the JSON library is included
 #include "LogProcessor.hpp"
 #include <filesystem>
 #include <cstdlib>
