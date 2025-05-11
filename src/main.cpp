@@ -1,43 +1,163 @@
+#include <iostream>
+#include <string>
+#include <thread>
+#include <chrono>
+#include <nlohmann/json.hpp>
 #include "TCPServer.hpp"
 #include "TCPClient.hpp"
-#include <nlohmann/json.hpp> // Ensure the JSON library is included
-#include "LogProcessor.hpp"
-#include <filesystem>
-#include <cstdlib>
-#include <iostream>
 
-void ensure_logs() {
-    if (!std::filesystem::exists("LogFiles")) {
-#ifdef _WIN32
-        system("extract_logs.bat");
+void print_usage() {
+    std::cout << "Usage:" << std::endl;
+    std::cout << "  server                          Start the server" << std::endl;
+    std::cout << "  client --log-folder <folder> --analysis <type> [--start <date>] [--end <date>]" << std::endl;
+    std::cout << "    <folder>: Path to the log files folder" << std::endl;
+    std::cout << "    <type>: Analysis type (user, ip, or level)" << std::endl;
+    std::cout << "    <date>: Optional date range in format 'YYYY-MM-DD HH:MM:SS'" << std::endl;
+}
+
+void format_statistics(const nlohmann::json& stats) {
+    std::cout << "  Count: " << stats["count"].get<int>() << std::endl;
+    std::cout << "  Min: " << stats["min"].get<double>() << std::endl;
+    std::cout << "  Max: " << stats["max"].get<double>() << std::endl;
+    std::cout << "  Average: " << stats["average"].get<double>() << std::endl;
+    std::cout << "  Median: " << stats["median"].get<double>() << std::endl;
+}
+
+void run_server() {
+    TCPServer server(8080);
+    server.start();
+}
+
+void run_client(const std::string& log_folder, const std::string& analysis_type,
+                const std::string& start_date = "", const std::string& end_date = "") {
+    
+    TCPClient client("127.0.0.1", 8080);
+    
+    // Prepare request
+    nlohmann::json request;
+    request["analysis_type"] = analysis_type;
+    request["log_folder"] = log_folder;
+    
+    if (!start_date.empty() && !end_date.empty()) {
+        request["start_date"] = start_date;
+        request["end_date"] = end_date;
+    }
+    
+    std::cout << "Sending request to server..." << std::endl;
+    
+    // Send request and get response
+    nlohmann::json response = client.send_request(request);
+    
+    if (response.contains("error")) {
+        std::cerr << "Error: " << response["error"].get<std::string>() << std::endl;
+        return;
+    }
+    
+    // Display results based on analysis type
+    std::cout << "=== Analysis Results ===" << std::endl;
+    
+    if (analysis_type == "user") {
+        std::cout << "Total Users: " << response["total_users"].get<int>() << std::endl;
+        std::cout << "Total Logs: " << response["total_logs"].get<int>() << std::endl;
+        
+        std::cout << "\nUser Statistics:" << std::endl;
+        for (const auto& user : response["users"]) {
+            std::cout << "\nUsername: " << user["username"].get<std::string>() << std::endl;
+            std::cout << "Log Count: " << user["log_count"].get<int>() << std::endl;
+            
+            if (user.contains("response_time_stats")) {
+                std::cout << "Response Time Statistics:" << std::endl;
+                format_statistics(user["response_time_stats"]);
+            }
+        }
+    }
+    else if (analysis_type == "ip") {
+        std::cout << "Unique IPs: " << response["unique_ips"].get<int>() << std::endl;
+        std::cout << "Total Requests: " << response["total_requests"].get<int>() << std::endl;
+        
+        std::cout << "\nIP Address Statistics:" << std::endl;
+        for (const auto& ip : response["ip_addresses"]) {
+            std::cout << "\nIP: " << ip["ip_address"].get<std::string>() << std::endl;
+            std::cout << "Request Count: " << ip["request_count"].get<int>() << std::endl;
+            
+            if (ip.contains("response_time_stats")) {
+                std::cout << "Response Time Statistics:" << std::endl;
+                format_statistics(ip["response_time_stats"]);
+            }
+        }
+    }
+    else if (analysis_type == "level") {
+        std::cout << "Total Logs: " << response["total_logs"].get<int>() << std::endl;
+        
+        std::cout << "\nLog Level Statistics:" << std::endl;
+        for (const auto& level : response["log_levels"]) {
+            std::cout << "\nLevel: " << level["level"].get<std::string>() << std::endl;
+            std::cout << "Count: " << level["count"].get<int>() << std::endl;
+            
+            if (level.contains("response_time_stats")) {
+                std::cout << "Response Time Statistics:" << std::endl;
+                format_statistics(level["response_time_stats"]);
+            }
+        }
     }
 }
 
 int main(int argc, char* argv[]) {
-    ensure_logs();
-
     if (argc < 2) {
-        std::cout << "Usage: NewApproachProgramming [server|client|process]\n";
+        print_usage();
         return 1;
     }
-
+    
     std::string mode = argv[1];
+    
     if (mode == "server") {
-        TCPServer server(54000);
-        server.start();
+        std::cout << "Starting server mode..." << std::endl;
+        run_server();
     }
     else if (mode == "client") {
-        TCPClient client("127.0.0.1", 54000);
-        client.start();
-    }
-    else if (mode == "process") {
-        LogProcessor processor("LogFiles");
-        processor.process_logs();
+        std::string log_folder;
+        std::string analysis_type;
+        std::string start_date;
+        std::string end_date;
+        
+        // Parse client arguments
+        for (int i = 2; i < argc; i++) {
+            std::string arg = argv[i];
+            
+            if (arg == "--log-folder" && i + 1 < argc) {
+                log_folder = argv[++i];
+            }
+            else if (arg == "--analysis" && i + 1 < argc) {
+                analysis_type = argv[++i];
+            }
+            else if (arg == "--start" && i + 1 < argc) {
+                start_date = argv[++i];
+            }
+            else if (arg == "--end" && i + 1 < argc) {
+                end_date = argv[++i];
+            }
+        }
+        
+        // Validate required parameters
+        if (log_folder.empty() || analysis_type.empty()) {
+            std::cerr << "Error: Missing required parameters." << std::endl;
+            print_usage();
+            return 1;
+        }
+        
+        // Validate analysis type
+        if (analysis_type != "user" && analysis_type != "ip" && analysis_type != "level") {
+            std::cerr << "Error: Invalid analysis type. Must be 'user', 'ip', or 'level'." << std::endl;
+            return 1;
+        }
+        
+        run_client(log_folder, analysis_type, start_date, end_date);
     }
     else {
-        std::cerr << "Unknown mode: " << mode << "\n";
+        std::cerr << "Invalid mode: " << mode << std::endl;
+        print_usage();
         return 1;
     }
-
+    
     return 0;
 }

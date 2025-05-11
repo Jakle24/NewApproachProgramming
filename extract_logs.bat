@@ -1,17 +1,20 @@
-:: filepath: c:\Users\Student\Documents\Module Dev Containers\NewApproachProgramming\extract_logs.bat
 @echo off
-set ZIP_FILE=LogFiles.zip
-set OUTPUT_DIR=LogFiles
+REM filepath: c:\Users\ethan\OneDrive\Documents\GitHub\NewApproachProgramming\extract_logs.bat
+echo Extracting log files...
 
-if not exist "%ZIP_FILE%" (
-    echo ERROR: %ZIP_FILE% not found in the current directory.
+REM Check if LogFiles.zip exists
+if not exist LogFiles.zip (
+    echo Error: LogFiles.zip not found!
+    echo Please download LogFiles.zip and place it in the project root directory.
     exit /b 1
 )
 
-ZipExtractor.exe "%ZIP_FILE%" "%OUTPUT_DIR%"
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to extract %ZIP_FILE%.
-    exit /b 1
-)
+REM Create LogFiles directory if it doesn't exist
+if not exist LogFiles mkdir LogFiles
 
-echo Extraction complete. Logs are in the %OUTPUT_DIR% directory.
+REM Use PowerShell to extract the ZIP file
+powershell -command "Expand-Archive -Path 'LogFiles.zip' -DestinationPath 'LogFiles' -Force"
+
+echo Log files extracted successfully to LogFiles directory.
+echo.
+echo You can now run the log analyzer.

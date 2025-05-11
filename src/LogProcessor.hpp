@@ -1,38 +1,28 @@
-#ifndef LOG_PROCESSOR_HPP
-#define LOG_PROCESSOR_HPP
-
+#pragma once
 #include <string>
 #include <vector>
-#include <map>
 #include <optional>
+#include <chrono>
+#include <nlohmann/json.hpp>  // Correct include path
 #include "LogEntry.hpp"
 
 struct DateRange {
     std::chrono::system_clock::time_point start;
     std::chrono::system_clock::time_point end;
-
-    bool contains(const std::chrono::system_clock::time_point& point) const {
-        return point >= start && point <= end;
-    }
 };
 
 class LogProcessor {
 public:
-    LogProcessor(const std::string& log_dir);
-    void process_logs(std::optional<DateRange> range = std::nullopt);
-std::vector<LogEntry> collect_logs(std::optional<DateRange> range = std::nullopt);
-nlohmann::json analyze_by_user(const std::vector<LogEntry>& entries);
-nlohmann::json analyze_by_ip(const std::vector<LogEntry>& entries);
-nlohmann::json analyze_by_level(const std::vector<LogEntry>& entries);
-
-
+    LogProcessor(const std::string& log_folder);
+    
+    // Process logs and return statistics as JSON
+    nlohmann::json analyze_by_user(const std::optional<DateRange>& date_range = std::nullopt);
+    nlohmann::json analyze_by_ip(const std::optional<DateRange>& date_range = std::nullopt);
+    nlohmann::json analyze_by_level(const std::optional<DateRange>& date_range = std::nullopt);
+    
 private:
-    std::string log_dir_;
-    std::vector<std::string> get_log_files();
-    std::vector<LogEntry> parse_txt(const std::string& filepath);
-    std::vector<LogEntry> parse_json(const std::string& filepath);
-    std::vector<LogEntry> parse_xml(const std::string& filepath);
-    void analyze(const std::vector<LogEntry>& entries);
+    std::string log_folder;
+    std::vector<LogEntry> load_logs(const std::optional<DateRange>& date_range);
+    // Helper methods for calculations
+    nlohmann::json calculate_statistics(const std::vector<double>& values);
 };
-
-#endif

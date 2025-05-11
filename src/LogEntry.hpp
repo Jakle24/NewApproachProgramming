@@ -1,18 +1,16 @@
-#ifndef LOG_ENTRY_HPP
-#define LOG_ENTRY_HPP
-
+#pragma once
 #include <string>
 #include <chrono>
+#include <optional>
+#include <regex>
 
 struct LogEntry {
-    std::string user;
-    std::string ip;
-    std::string level;
-    std::string timestamp; // Raw string
-    std::chrono::system_clock::time_point parsed_time;
-
-    // Optional: helper to parse timestamp on creation
-    bool parse_timestamp();
+    std::chrono::system_clock::time_point timestamp;
+    std::string log_level;
+    std::string username;
+    std::string ip_address;
+    std::string message;
+    double response_time;  // in milliseconds
+    
+    static std::optional<LogEntry> parse_log_line(const std::string& line);
 };
-
-#endif

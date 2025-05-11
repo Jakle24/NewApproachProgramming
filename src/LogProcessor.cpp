@@ -6,19 +6,19 @@
 #include <iostream>
 #include <sstream>
 #include <map>
-
+#include <algorithm>
+#include <numeric>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 // Constructor
-LogProcessor::LogProcessor(const std::string& log_dir)
-    : log_dir_(log_dir) {}
+LogProcessor::LogProcessor(const std::string& log_folder) : log_folder(log_folder) {}
 
 // Helper: List files in the log directory
 std::vector<std::string> LogProcessor::get_log_files() {
     std::vector<std::string> files;
-    for (const auto& entry : fs::directory_iterator(log_dir_)) {
+    for (const auto& entry : fs::directory_iterator(log_folder)) {
         if (entry.is_regular_file()) {
             files.push_back(entry.path().string());
         }
@@ -48,8 +48,6 @@ std::vector<LogEntry> LogProcessor::parse_txt(const std::string& filepath) {
     }
     return entries;
 }
-
-using json = nlohmann::json;
 
 std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
     std::vector<LogEntry> entries;
@@ -87,7 +85,6 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
     return entries;
 }
 
-
 // TODO: XML parser placeholder
 std::vector<LogEntry> LogProcessor::parse_xml(const std::string& filepath) {
     std::cerr << "XML parsing not implemented yet: " << filepath << std::endl;
@@ -122,96 +119,178 @@ void LogProcessor::analyze(const std::vector<LogEntry>& entries) {
     }
 }
 
-// Main processing method
-void LogProcessor::process_logs(std::optional<DateRange> range) {
-    std::vector<LogEntry> all_entries;
-
-    auto files = get_log_files();
-    for (const auto& file : files) {
-        std::vector<LogEntry> entries;
-
-        if (file.ends_with(".json")) {
-            entries = parse_json(file);
-        } else if (file.ends_with(".xml")) {
-            entries = parse_xml(file);
-        } else {
-            entries = parse_txt(file);
-        }
-
-        for (auto& e : entries) {
-            if (!range || range->contains(e.parsed_time)) {
-                all_entries.push_back(e);
+std::vector<LogEntry> LogProcessor::load_logs(const std::optional<DateRange>& date_range) {
+    std::vector<LogEntry> logs;
+    
+    try {
+        for (const auto& entry : fs::directory_iterator(log_folder)) {
+            if (entry.path().extension() == ".log") {
+                std::ifstream file(entry.path());
+                if (!file.is_open()) {
+                    std::cerr << "Failed to open: " << entry.path() << std::endl;
+                    continue;
+                }
+                
+                std::string line;
+                while (std::getline(file, line)) {
+                    auto log_entry = LogEntry::parse_log_line(line);
+                    if (log_entry) {
+                        // Apply date filter if specified
+                        if (date_range) {
+                            if (log_entry->timestamp >= date_range->start && 
+                                log_entry->timestamp <= date_range->end) {
+                                logs.push_back(*log_entry);
+                            }
+                        } else {
+                            logs.push_back(*log_entry);
+                        }
+                    }
+                }
             }
         }
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading logs: " << e.what() << std::endl;
     }
+    
+    return logs;
+}
 
-    if (all_entries.empty()) {
-        std::cout << "No valid log entries found.\n";
+nlohmann::json LogProcessor::calculate_statistics(const std::vector<double>& values) {
+    nlohmann::json stats;
+    
+    if (values.empty()) {
+        stats["count"] = 0;
+        stats["min"] = 0;
+        stats["max"] = 0;
+        stats["average"] = 0;
+        stats["median"] = 0;
+        return stats;
+    }
+    
+    // Calculate statistics
+    stats["count"] = values.size();
+    stats["min"] = *std::min_element(values.begin(), values.end());
+    stats["max"] = *std::max_element(values.begin(), values.end());
+    
+    double sum = std::accumulate(values.begin(), values.end(), 0.0);
+    stats["average"] = sum / values.size();
+    
+    // Calculate median
+    std::vector<double> sorted_values = values;
+    std::sort(sorted_values.begin(), sorted_values.end());
+    size_t middle = sorted_values.size() / 2;
+    if (sorted_values.size() % 2 == 0) {
+        stats["median"] = (sorted_values[middle-1] + sorted_values[middle]) / 2.0;
     } else {
-        analyze(all_entries);
+        stats["median"] = sorted_values[middle];
     }
+    
+    return stats;
 }
 
-std::vector<LogEntry> LogProcessor::collect_logs(std::optional<DateRange> range) {
-    std::vector<LogEntry> all_entries;
-
-    auto files = get_log_files();
-    for (const auto& file : files) {
-        std::vector<LogEntry> entries;
-
-        if (file.ends_with(".json")) {
-            entries = parse_json(file);
-        } else if (file.ends_with(".xml")) {
-            entries = parse_xml(file);  // You can stub this for now
-        } else {
-            entries = parse_txt(file);
-        }
-
-        for (auto& e : entries) {
-            if (!range || range->contains(e.parsed_time)) {
-                all_entries.push_back(e);
-            }
-        }
-    }
-
-    return all_entries;
-}
-
-nlohmann::json LogProcessor::analyze_by_user(const std::vector<LogEntry>& entries) {
-    std::map<std::string, int> counts;
-    for (const auto& e : entries) {
-        counts[e.user]++;
-    }
-
+nlohmann::json LogProcessor::analyze_by_user(const std::optional<DateRange>& date_range) {
+    auto logs = load_logs(date_range);
     nlohmann::json result;
-    for (const auto& [user, count] : counts) {
-        result[user] = count;
+    
+    // Count logs per user
+    std::map<std::string, int> user_counts;
+    std::map<std::string, std::vector<double>> response_times;
+    
+    for (const auto& log : logs) {
+        user_counts[log.username]++;
+        if (log.response_time > 0) {
+            response_times[log.username].push_back(log.response_time);
+        }
     }
+    
+    // Generate JSON with user statistics
+    nlohmann::json users = nlohmann::json::array();
+    for (const auto& [username, count] : user_counts) {
+        nlohmann::json user;
+        user["username"] = username;
+        user["log_count"] = count;
+        
+        if (!response_times[username].empty()) {
+            user["response_time_stats"] = calculate_statistics(response_times[username]);
+        }
+        
+        users.push_back(user);
+    }
+    
+    result["users"] = users;
+    result["total_users"] = users.size();
+    result["total_logs"] = logs.size();
+    
     return result;
 }
 
-nlohmann::json LogProcessor::analyze_by_ip(const std::vector<LogEntry>& entries) {
-    std::map<std::string, int> counts;
-    for (const auto& e : entries) {
-        counts[e.ip]++;
-    }
-
+nlohmann::json LogProcessor::analyze_by_ip(const std::optional<DateRange>& date_range) {
+    auto logs = load_logs(date_range);
     nlohmann::json result;
-    for (const auto& [ip, count] : counts) {
-        result[ip] = count;
+    
+    // Count logs per IP
+    std::map<std::string, int> ip_counts;
+    std::map<std::string, std::vector<double>> response_times;
+    
+    for (const auto& log : logs) {
+        ip_counts[log.ip_address]++;
+        if (log.response_time > 0) {
+            response_times[log.ip_address].push_back(log.response_time);
+        }
     }
+    
+    // Generate JSON with IP statistics
+    nlohmann::json ips = nlohmann::json::array();
+    for (const auto& [ip, count] : ip_counts) {
+        nlohmann::json ip_data;
+        ip_data["ip_address"] = ip;
+        ip_data["request_count"] = count;
+        
+        if (!response_times[ip].empty()) {
+            ip_data["response_time_stats"] = calculate_statistics(response_times[ip]);
+        }
+        
+        ips.push_back(ip_data);
+    }
+    
+    result["ip_addresses"] = ips;
+    result["unique_ips"] = ips.size();
+    result["total_requests"] = logs.size();
+    
     return result;
 }
 
-nlohmann::json LogProcessor::analyze_by_level(const std::vector<LogEntry>& entries) {
-    std::map<std::string, int> counts;
-    for (const auto& e : entries) {
-        counts[e.level]++;
-    }
-
+nlohmann::json LogProcessor::analyze_by_level(const std::optional<DateRange>& date_range) {
+    auto logs = load_logs(date_range);
     nlohmann::json result;
-    for (const auto& [level, count] : counts) {
-        result[level] = count;
+    
+    // Count logs per level
+    std::map<std::string, int> level_counts;
+    std::map<std::string, std::vector<double>> response_times;
+    
+    for (const auto& log : logs) {
+        level_counts[log.log_level]++;
+        if (log.response_time > 0) {
+            response_times[log.log_level].push_back(log.response_time);
+        }
     }
+    
+    // Generate JSON with level statistics
+    nlohmann::json levels = nlohmann::json::array();
+    for (const auto& [level, count] : level_counts) {
+        nlohmann::json level_data;
+        level_data["level"] = level;
+        level_data["count"] = count;
+        
+        if (!response_times[level].empty()) {
+            level_data["response_time_stats"] = calculate_statistics(response_times[level]);
+        }
+        
+        levels.push_back(level_data);
+    }
+    
+    result["log_levels"] = levels;
+    result["total_logs"] = logs.size();
+    
     return result;
 }

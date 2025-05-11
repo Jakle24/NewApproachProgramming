@@ -11,6 +11,77 @@
 #include <mutex>
 std::mutex cout_mutex;
 
+TCPServer::TCPServer(int port) : port(port), running(false) {}
+
+TCPServer::~TCPServer() {
+    stop();
+    WSACleanup();
+}
+
+bool TCPServer::initialize_winsock() {
+    WSADATA wsaData;
+    return WSAStartup(MAKEWORD(2, 2), &wsaData) == 0;
+}
+
+void TCPServer::start() {
+    if (!initialize_winsock()) {
+        std::cerr << "Failed to initialize Winsock" << std::endl;
+        return;
+    }
+    
+    server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (server_socket == INVALID_SOCKET) {
+        std::cerr << "Error creating socket: " << WSAGetLastError() << std::endl;
+        return;
+    }
+    
+    sockaddr_in service;
+    service.sin_family = AF_INET;
+    service.sin_addr.s_addr = INADDR_ANY;
+    service.sin_port = htons(port);
+    
+    if (bind(server_socket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
+        std::cerr << "Bind failed with error: " << WSAGetLastError() << std::endl;
+        closesocket(server_socket);
+        return;
+    }
+    
+    if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
+        std::cerr << "Listen failed with error: " << WSAGetLastError() << std::endl;
+        closesocket(server_socket);
+        return;
+    }
+    
+    std::cout << "Server started. Listening on port " << port << "..." << std::endl;
+    
+    running = true;
+    std::vector<std::thread> client_threads;
+    
+    while (running) {
+        SOCKET client_socket = accept(server_socket, NULL, NULL);
+        if (client_socket == INVALID_SOCKET) {
+            if (running) {
+                std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+            }
+            continue;
+        }
+        
+        std::cout << "Client connected." << std::endl;
+        client_threads.push_back(std::thread(&TCPServer::handle_client, this, client_socket));
+    }
+    
+    for (auto& thread : client_threads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+}
+
+void TCPServer::stop() {
+    running = false;
+    closesocket(server_socket);
+}
+
 void TCPServer::handle_client(SOCKET client_socket) {
     char buffer[8192];
     int bytesReceived = recv(client_socket, buffer, sizeof(buffer), 0);
@@ -52,27 +123,34 @@ void TCPServer::handle_client(SOCKET client_socket) {
 
         // Process logs
         LogProcessor processor(log_folder);
-        std::vector<LogEntry> all_logs = processor.collect_logs(date_range);
-
-        // Build JSON response
-        json response;
-
+        json result;
+        
         if (analysis_type == "user") {
-            response["user"] = processor.analyze_by_user(all_logs);
+            result = processor.analyze_by_user(date_range);
         } else if (analysis_type == "ip") {
-            response["ip"] = processor.analyze_by_ip(all_logs);
+            result = processor.analyze_by_ip(date_range);
         } else if (analysis_type == "level") {
-            response["level"] = processor.analyze_by_level(all_logs);
+            result = processor.analyze_by_level(date_range);
         } else {
-            response["error"] = "Unknown analysis type.";
+            result["error"] = "Unknown analysis type";
         }
-
-        std::string response_str = response.dump();
-        send(client_socket, response_str.c_str(), static_cast<int>(response_str.size()), 0);
-
+        
+        std::string response = result.dump(4);
+        send(client_socket, response.c_str(), response.length(), 0);
+        
     } catch (const std::exception& e) {
-        std::cerr << "Error processing request: " << e.what() << std::endl;
+        std::string error_msg = "Error processing request: ";
+        error_msg += e.what();
+        
+        {
+            std::lock_guard<std::mutex> lock(cout_mutex);
+            std::cerr << error_msg << std::endl;
+        }
+        
+        nlohmann::json error_response = {{"error", error_msg}};
+        std::string response = error_response.dump();
+        send(client_socket, response.c_str(), response.length(), 0);
     }
-
+    
     closesocket(client_socket);
 }
