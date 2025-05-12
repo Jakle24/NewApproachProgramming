@@ -6,6 +6,11 @@
 #include "TCPServer.hpp"
 #include "TCPClient.hpp"
 
+/**
+ * @brief Displays usage instructions for the application
+ * 
+ * Shows available command-line options and parameters for both server and client modes.
+ */
 void print_usage() {
     std::cout << "Usage:" << std::endl;
     std::cout << "  server                          Start the server" << std::endl;
@@ -15,6 +20,12 @@ void print_usage() {
     std::cout << "    <date>: Optional date range in format 'YYYY-MM-DD HH:MM:SS'" << std::endl;
 }
 
+/**
+ * @brief Formats and displays statistical data in a readable format
+ * @param stats JSON object containing statistical measures
+ * 
+ * Presents count, minimum, maximum, average, and median values.
+ */
 void format_statistics(const nlohmann::json& stats) {
     std::cout << "  Count: " << stats["count"].get<int>() << std::endl;
     std::cout << "  Min: " << stats["min"].get<double>() << std::endl;
@@ -23,11 +34,26 @@ void format_statistics(const nlohmann::json& stats) {
     std::cout << "  Median: " << stats["median"].get<double>() << std::endl;
 }
 
+/**
+ * @brief Entry point for server mode operation
+ * 
+ * Initializes and starts the TCP server to handle client connections.
+ */
 void run_server() {
     TCPServer server(8080);
     server.start();
 }
 
+/**
+ * @brief Entry point for client mode operation
+ * @param log_folder Directory containing log files
+ * @param analysis_type Type of analysis to perform (user/ip/level)
+ * @param start_date Optional start of date range filter
+ * @param end_date Optional end of date range filter
+ * 
+ * Connects to the server, sends the analysis request with parameters,
+ * receives results, and displays them in a formatted manner.
+ */
 void run_client(const std::string& log_folder, const std::string& analysis_type,
                 const std::string& start_date = "", const std::string& end_date = "") {
     
@@ -102,6 +128,15 @@ void run_client(const std::string& log_folder, const std::string& analysis_type,
     }
 }
 
+/**
+ * @brief Application entry point
+ * @param argc Number of command-line arguments
+ * @param argv Array of command-line argument strings
+ * @return Exit code (0 for success, non-zero for errors)
+ * 
+ * Parses command-line arguments, determines operation mode (server or client),
+ * and delegates to the appropriate function.
+ */
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         print_usage();
