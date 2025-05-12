@@ -27,25 +27,23 @@ std::vector<std::string> LogProcessor::get_log_files() {
 }
 
 // Helper: Parse TXT/CSV logs
-std::vector<LogEntry> LogProcessor::parse_txt(const std::string& filepath) {
+std::vector<LogEntry> LogProcessor::parse_txt(const std::string& file_path) {
     std::vector<LogEntry> entries;
-    std::ifstream file(filepath);
+    std::ifstream file(file_path);
+    
+    if (!file.is_open()) {
+        std::cerr << "Failed to open: " << file_path << std::endl;
+        return entries;
+    }
+    
     std::string line;
-
     while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string user, ip, level, timestamp;
-
-        std::getline(ss, user, ',');
-        std::getline(ss, ip, ',');
-        std::getline(ss, level, ',');
-        std::getline(ss, timestamp, ',');
-
-        LogEntry entry{user, ip, level, timestamp};
-        if (entry.parse_timestamp()) {
-            entries.push_back(entry);
+        auto entry_opt = LogEntry::parse_log_line(line);
+        if (entry_opt) {
+            entries.push_back(*entry_opt);
         }
     }
+    
     return entries;
 }
 
@@ -64,16 +62,16 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
         }
 
         for (const auto& log : j["logs"]) {
-            if (log.contains("user") && log.contains("ip") && log.contains("level") && log.contains("timestamp")) {
+            if (log.contains("username") && log.contains("ip_address") && log.contains("log_level") && log.contains("timestamp")) {
                 LogEntry entry;
-                entry.user = log["user"].get<std::string>();
-                entry.ip = log["ip"].get<std::string>();
-                entry.level = log["level"].get<std::string>();
-                entry.timestamp = log["timestamp"].get<std::string>();
+                entry.timestamp = LogEntry::parse_timestamp(log["timestamp"].get<std::string>());
+                entry.username = log["username"].get<std::string>();
+                entry.ip_address = log["ip_address"].get<std::string>();
+                entry.log_level = log["log_level"].get<std::string>();
+                entry.message = log["message"].get<std::string>();
+                entry.response_time = log.value("response_time", 0.0);
 
-                if (entry.parse_timestamp()) {
-                    entries.push_back(entry);
-                }
+                entries.push_back(entry);
             } else {
                 std::cerr << "Skipping incomplete log entry.\n";
             }
@@ -98,9 +96,9 @@ void LogProcessor::analyze(const std::vector<LogEntry>& entries) {
     std::map<std::string, int> by_level;
 
     for (const auto& e : entries) {
-        by_user[e.user]++;
-        by_ip[e.ip]++;
-        by_level[e.level]++;
+        by_user[e.username]++;
+        by_ip[e.ip_address]++;
+        by_level[e.log_level]++;
     }
 
     std::cout << "\n--- Log Attempts by User ---\n";
