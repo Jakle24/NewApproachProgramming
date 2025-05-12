@@ -22,14 +22,17 @@ Download LogFiles.zip
 Place it in the project root directory
 Extract using the included script:
 
-extract_logs.bat
+.\extract_logs.bat
 
 3. Build the application
 
 Open a Developer Command Prompt for Visual Studio
 Run:
 
+cd C:\Users\Student\Documents\Module Dev Containers\NewApproachProgramming
 cl /EHsc /std:c++17 src\*.cpp ws2_32.lib /I. /Fe:NewApproachProgramming.exe
+
+This directs the terminal to the right place then compiles the files within.
 
 4. Run the server
 

@@ -1,28 +1,32 @@
+// filepath: src\LogProcessor.cpp
 #include "LogProcessor.hpp"
-#include "LogEntry.hpp"
-#include <nlohmann/json.hpp>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
+#include <fstream>
 #include <sstream>
-#include <map>
+#include <regex>
+#include <filesystem>
 #include <algorithm>
-#include <numeric>
+#include <numeric>  // For std::accumulate
+#include <nlohmann/json.hpp>  // For JSON support
 
 namespace fs = std::filesystem;
-using json = nlohmann::json;
 
-// Constructor
-LogProcessor::LogProcessor(const std::string& log_folder) : log_folder(log_folder) {}
+LogProcessor::LogProcessor(const std::string& log_directory) : log_folder(log_directory) {
+    // Initialize maps
+    users_count = {};
+    ip_count = {};
+    level_count = {};
+}
 
-// Helper: List files in the log directory
-std::vector<std::string> LogProcessor::get_log_files() {
+std::vector<std::string> LogProcessor::get_log_files(const std::string& directory) {
     std::vector<std::string> files;
-    for (const auto& entry : fs::directory_iterator(log_folder)) {
+    
+    for (const auto& entry : fs::directory_iterator(directory)) {
         if (entry.is_regular_file()) {
             files.push_back(entry.path().string());
         }
     }
+    
     return files;
 }
 

@@ -1,28 +1,43 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
 #include <optional>
-#include <chrono>
-#include <nlohmann/json.hpp>  // Correct include path
+#include <regex>
+#include <filesystem>
 #include "LogEntry.hpp"
-
-struct DateRange {
-    std::chrono::system_clock::time_point start;
-    std::chrono::system_clock::time_point end;
-};
+#include "DateRange.hpp"
 
 class LogProcessor {
 public:
-    LogProcessor(const std::string& log_folder);
+    LogProcessor(const std::string& log_directory);
     
-    // Process logs and return statistics as JSON
-    nlohmann::json analyze_by_user(const std::optional<DateRange>& date_range = std::nullopt);
-    nlohmann::json analyze_by_ip(const std::optional<DateRange>& date_range = std::nullopt);
-    nlohmann::json analyze_by_level(const std::optional<DateRange>& date_range = std::nullopt);
+    std::vector<LogEntry> process_logs();
+    void display_statistics();
+    
+    // File handling
+    std::vector<std::string> get_log_files(const std::string& directory);
+    
+    // Parsing methods - match implementation in LogProcessor.cpp
+    std::vector<LogEntry> parse_txt(const std::string& filename);
+    std::vector<LogEntry> parse_json(const std::string& filename);
+    std::vector<LogEntry> parse_xml(const std::string& filename);
+    
+    // Analysis methods
+    void analyze(const std::vector<LogEntry>& logs);
+    void calculate_statistics(const std::vector<LogEntry>& logs);
+    
+    // Advanced analysis
+    std::map<std::string, double> analyze_by_user(const std::vector<LogEntry>& logs, const std::optional<DateRange>& date_range = std::nullopt);
+    std::map<std::string, double> analyze_by_ip(const std::vector<LogEntry>& logs, const std::optional<DateRange>& date_range = std::nullopt);
+    std::map<std::string, double> analyze_by_level(const std::vector<LogEntry>& logs, const std::optional<DateRange>& date_range = std::nullopt);
+    
+    // Additional method for loading logs with date filtering
+    std::vector<LogEntry> load_logs(const std::optional<DateRange>& date_range = std::nullopt);
     
 private:
     std::string log_folder;
-    std::vector<LogEntry> load_logs(const std::optional<DateRange>& date_range);
-    // Helper methods for calculations
-    nlohmann::json calculate_statistics(const std::vector<double>& values);
+    std::map<std::string, int> users_count;
+    std::map<std::string, int> ip_count;
+    std::map<std::string, int> level_count;
 };

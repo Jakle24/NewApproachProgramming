@@ -11,6 +11,10 @@
         "xstring": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "iomanip": "cpp"
+        "iomanip": "cpp",
+        "string": "cpp",
+        "iostream": "cpp",
+        "fstream": "cpp",
+        "algorithm": "cpp"
     }
 }

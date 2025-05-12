@@ -1,11 +1,10 @@
 @echo off
-REM filepath: c:\Users\ethan\OneDrive\Documents\GitHub\NewApproachProgramming\extract_logs.bat
 echo Extracting log files...
 
 REM Check if LogFiles.zip exists
-if not exist LogFiles.zip (
-    echo Error: LogFiles.zip not found!
-    echo Please download LogFiles.zip and place it in the project root directory.
+if not exist logs.zip (
+    echo Error: logs.zip not found!
+    echo Please download logs.zip and place it in the project root directory.
     exit /b 1
 )
 
