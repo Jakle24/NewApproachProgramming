@@ -1,0 +1,12 @@
+﻿{
+  "logs": [
+    {
+      "timestamp": "2025-05-01 10:00:00",
+      "username": "admin",
+      "ip_address": "127.0.0.1",
+      "log_level": "INFO",
+      "message": "Login successful",
+      "response_time": 0.5
+    }
+  ]
+}

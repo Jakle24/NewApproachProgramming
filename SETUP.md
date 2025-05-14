@@ -74,3 +74,41 @@ Troubleshooting
 Ensure you're using the Visual Studio Developer Command Prompt when building
 Verify that LogFiles.zip has been extracted correctly
 Start the server before running any client commands
+
+
+
+
+
+QUICK USE
+
+Client Mode
+The client mode is used for analyzing log files with several required and optional parameters:
+
+Basic Usage
+
+.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
+
+
+Analysis Types
+You can specify one of three analysis types:
+
+# For user-based analysis
+.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
+
+# For IP-based analysis
+.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis ip
+
+# For level-based analysis
+.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis level
+
+Date Filtering
+To analyze logs within a specific date range:
+
+.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user --start "2025-05-01 00:00:00" --end "2025-05-14 23:59:59"
+
+
+Tips
+Use quotes around folder paths that contain spaces
+Date format must be 'YYYY-MM-DD HH:MM:SS'
+You can use just the start date without the end date (or vice versa)
+Make sure the log folder path points to a directory containing valid log files

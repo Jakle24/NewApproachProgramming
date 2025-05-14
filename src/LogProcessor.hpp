@@ -3,7 +3,9 @@
 #include <vector>
 #include <optional>
 #include <chrono>
-#include <nlohmann/json.hpp>
+#include <nlohmann::json.hpp>
+#include <thread>
+#include <mutex>
 #include "LogEntry.hpp"
 
 /**
@@ -86,6 +88,13 @@ public:
      */
     void analyze(const std::vector<LogEntry>& logs);
     
+    /**
+     * @brief Processes logs in parallel
+     * @param date_range Optional time range to filter logs
+     * @return Vector of processed LogEntry objects
+     */
+    std::vector<LogEntry> process_logs_parallel(const std::optional<DateRange>& date_range);
+
 private:
     std::string log_folder;  // Directory containing log files to process
     
@@ -102,4 +111,12 @@ private:
      * @return JSON object containing min, max, average, median, and count
      */
     nlohmann::json calculate_statistics(const std::vector<double>& values);
+
+    /**
+     * @brief Extracts the content of a specific XML tag
+     * @param xml XML string to parse
+     * @param tag Name of the tag to extract
+     * @return Content of the specified XML tag
+     */
+    std::string extract_xml_tag(const std::string& xml, const std::string& tag);
 };

@@ -1,28 +1,5 @@
 # NewApproachProgramming
 
-# Project Setup
-
-## Prerequisites
-- Ensure you have `LogFiles.zip` downloaded and placed in the root directory of the project.
-- You can obtain it from [link to your shared file].
-
-## How to Setup the Logs
-
-1. Download the `LogFiles.zip` from the link provided.
-2. Place it in the root directory of the project (where the `README.md` file is located).
-3. Run the `extract_logs.sh` (for Linux/Mac) or `extract_logs.bat` (for Windows) script to unzip the logs automatically.
-
-### Automatically Extract Logs (Optional)
-To extract the logs after placing the `LogFiles.zip` file:
-- **Linux/Mac:**  
-  Run the following command in the terminal:
-  
-  ```bash
-  ./extract_logs.sh
-
-
-The above was a lesson learned in adding many large files into a Repository...it wont allow commits and syncing! The work around, currently, is to make a tool that will follow the given criteria:
-
 ## Project Brief
 
 ## Overview
@@ -202,31 +179,3 @@ Final Checklist:
 
 ✅ Review the code for maintainability and clarity.
 
-
-
-
-
-🛠️ Setup Instructions
-1. Download & Prepare Log Files
-Place your LogFiles.zip in the root of the project directory (next to extract_logs.bat).
-
-Run extract_logs.bat (or just run the program — it will auto-extract if needed).
-
-2. Build the Project (Windows – Manual Compile)
-If you’re using the Visual Studio Developer Command Prompt:
-
-cmd
-Copy
-Edit
-cl /EHsc /std:c++17 src\*.cpp ws2_32.lib /I.\nlohmann /Fe:NewApproachProgramming.exe
-This will generate NewApproachProgramming.exe.
-
-3. Run the App
-You can now launch the program in one of three modes:
-
-bash
-Copy
-Edit
-NewApproachProgramming.exe server     # Start the server
-NewApproachProgramming.exe client     # Start the client and send requests
-NewApproachProgramming.exe process    # Run log analysis locally (no network)
