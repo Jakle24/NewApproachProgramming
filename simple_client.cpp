@@ -3,31 +3,88 @@
 #include <nlohmann/json.hpp>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <algorithm>
 
 #pragma comment(lib, "ws2_32.lib")
 
+void printUsage() {
+    std::cout << "Usage:\n";
+    std::cout << "  For analysis: simple_client --analysis --log-folder <folder> --type <user|ip|level>\n";
+    std::cout << "  For parsing:  simple_client --parse --file <path> --type <json|txt>\n";
+}
+
 int main(int argc, char* argv[]) {
-    // Parse command line arguments
-    if (argc < 5) {
-        std::cout << "Usage: simple_client --log-folder <folder> --analysis <type>\n";
+    if (argc < 3) {
+        printUsage();
         return 1;
     }
     
-    std::string log_folder;
-    std::string analysis_type;
+    std::string mode = argv[1];
+    nlohmann::json request;
     
-    for (int i = 1; i < argc; i += 2) {
-        std::string arg = argv[i];
-        if (arg == "--log-folder" && i + 1 < argc) {
-            log_folder = argv[i + 1];
-        } 
-        else if (arg == "--analysis" && i + 1 < argc) {
-            analysis_type = argv[i + 1];
+    if (mode == "--analysis") {
+        // Original analysis mode
+        if (argc < 6) {
+            printUsage();
+            return 1;
         }
+        
+        std::string log_folder;
+        std::string analysis_type;
+        
+        for (int i = 2; i < argc; i += 2) {
+            std::string arg = argv[i];
+            if (arg == "--log-folder" && i + 1 < argc) {
+                log_folder = argv[i + 1];
+            } 
+            else if (arg == "--type" && i + 1 < argc) {
+                analysis_type = argv[i + 1];
+            }
+        }
+        
+        if (log_folder.empty() || analysis_type.empty()) {
+            std::cout << "Missing required parameters\n";
+            printUsage();
+            return 1;
+        }
+        
+        request["request_type"] = "analysis";
+        request["log_folder"] = log_folder;
+        request["analysis_type"] = analysis_type;
     }
-    
-    if (log_folder.empty() || analysis_type.empty()) {
-        std::cout << "Missing required parameters\n";
+    else if (mode == "--parse") {
+        // New parsing mode
+        if (argc < 6) {
+            printUsage();
+            return 1;
+        }
+        
+        std::string file_path;
+        std::string file_type;
+        
+        for (int i = 2; i < argc; i += 2) {
+            std::string arg = argv[i];
+            if (arg == "--file" && i + 1 < argc) {
+                file_path = argv[i + 1];
+            } 
+            else if (arg == "--type" && i + 1 < argc) {
+                file_type = argv[i + 1];
+            }
+        }
+        
+        if (file_path.empty() || file_type.empty()) {
+            std::cout << "Missing required parameters\n";
+            printUsage();
+            return 1;
+        }
+        
+        request["request_type"] = "parse";
+        request["file_path"] = file_path;
+        request["file_type"] = file_type;
+    }
+    else {
+        std::cout << "Unknown mode: " << mode << "\n";
+        printUsage();
         return 1;
     }
     
@@ -63,25 +120,54 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Connected to server\n";
     
-    // Create JSON request
-    nlohmann::json request;
-    request["log_folder"] = log_folder;
-    request["analysis_type"] = analysis_type;
-    
     // Send request
     std::string requestStr = request.dump();
+    std::cout << "Sending request: " << requestStr << std::endl;
     send(sock, requestStr.c_str(), requestStr.size(), 0);
     
     // Receive response
-    char buffer[4096];
-    int bytesReceived = recv(sock, buffer, 4096, 0);
+    char buffer[65536]; // Larger buffer for potentially large responses
+    int bytesReceived = recv(sock, buffer, 65536, 0);
     if (bytesReceived > 0) {
         buffer[bytesReceived] = '\0';
         
         // Parse and display results
         nlohmann::json response = nlohmann::json::parse(buffer);
-        std::cout << "\n=== Analysis Results ===\n\n";
-        std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+        
+        if (mode == "--analysis") {
+            // Display analysis results
+            std::cout << "\n=== Analysis Results ===\n\n";
+            std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+        }
+        else if (mode == "--parse") {
+            // Display parsing results
+            if (response.contains("status") && response["status"] == "success") {
+                std::cout << "\n=== Parsing Results ===\n";
+                std::cout << "Successfully parsed " << response["count"].get<int>() << " entries\n\n";
+                
+                // Display first few entries
+                int entries_size = static_cast<int>(response["entries"].size());
+                int display_count = (entries_size < 5) ? entries_size : 5;
+                for (int i = 0; i < display_count; i++) {
+                    const auto& entry = response["entries"][i];
+                    
+                    std::cout << "------------------------------------\n";
+                    std::cout << "Timestamp: " << entry["timestamp"].get<std::string>() << "\n";
+                    std::cout << "Username: " << entry["username"].get<std::string>() << "\n";
+                    std::cout << "IP Address: " << entry["ip_address"].get<std::string>() << "\n";
+                    std::cout << "Log Level: " << entry["log_level"].get<std::string>() << "\n";
+                    std::cout << "Message: " << entry["message"].get<std::string>() << "\n";
+                }
+                
+                if (display_count < (int)response["entries"].size()) {
+                    std::cout << "\n... and " << (response["entries"].size() - display_count) 
+                              << " more entries\n";
+                }
+            }
+            else {
+                std::cout << "Error: " << response["message"].get<std::string>() << std::endl;
+            }
+        }
     }
     
     // Close socket

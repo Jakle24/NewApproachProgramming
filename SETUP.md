@@ -2,7 +2,19 @@ Simple Guide: Using Your Log Parser
 
 1. Compile the Test Parser
 
+cd C:\Users\ethan\OneDrive\Documents\GitHub\NewApproachProgramming
+
 cl /EHsc /std:c++17 test_parser.cpp src\LogEntry.cpp /I"include" /Fe:test_parser.exe
+
+**SERVER SETUP INSTRUCTIONS**
+
+Server: .\simple_server.exe
+You should see: "Server started on port 8080"
+
+Run the Client (in a separate command window)
+For user analysis:
+Client: simple_client.exe --log-folder "Logs\logs" --analysis user
+
 
 2. Parse JSON Files
 
