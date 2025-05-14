@@ -122,14 +122,17 @@ int main(int argc, char* argv[]) {
     
     // Send request
     std::string requestStr = request.dump();
-    std::cout << "Sending request: " << requestStr << std::endl;
+    std::cout << "DEBUG: Sending request: " << requestStr << std::endl;
+    std::cout << "DEBUG: Request length: " << requestStr.size() << " bytes" << std::endl;
     send(sock, requestStr.c_str(), requestStr.size(), 0);
     
     // Receive response
     char buffer[65536]; // Larger buffer for potentially large responses
     int bytesReceived = recv(sock, buffer, 65536, 0);
+    std::cout << "DEBUG: Bytes received: " << bytesReceived << std::endl;
     if (bytesReceived > 0) {
         buffer[bytesReceived] = '\0';
+        std::cout << "DEBUG: Response preview: " << std::string(buffer).substr(0, 100) << "..." << std::endl;
         
         // Parse and display results
         nlohmann::json response = nlohmann::json::parse(buffer);
