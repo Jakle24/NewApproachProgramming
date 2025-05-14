@@ -1,0 +1,12 @@
+{
+  "logs": [
+    {
+      "username": "ethan",
+      "ip_address": "192.168.0.1",
+      "log_level": "INFO",
+      "timestamp": "2024-04-01T12:00:00Z",
+      "message": "Login successful",
+      "response_time": 123.45
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 #include <vector>
 #include <optional>
 #include <chrono>
-#include <nlohmann::json.hpp>
+#include <nlohmann/json.hpp> 
 #include <thread>
 #include <mutex>
 #include "LogEntry.hpp"
@@ -105,7 +105,6 @@ private:
      * @param date_range Optional filter criteria for log timestamps
      * @return Combined vector of filtered log entries
      */
-    std::vector<LogEntry> load_logs(const std::optional<DateRange>& date_range);
     
     /**
      * @brief Calculates statistical metrics for a set of numeric values

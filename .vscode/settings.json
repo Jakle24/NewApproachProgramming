@@ -12,6 +12,7 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "iomanip": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "iterator": "cpp"
     }
 }
