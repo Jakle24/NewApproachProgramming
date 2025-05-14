@@ -67,7 +67,14 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
                 
                 LogEntry entry;
                 entry.timestamp = LogEntry::parse_timestamp(j["timestamp"]);
-                entry.username = j["username"];
+                if (j.contains("user_id")) {
+                    // Convert user_id to string
+                    entry.username = "user_" + std::to_string(j["user_id"].get<int>());
+                } else if (j.contains("username")) {
+                    entry.username = j["username"].get<std::string>();
+                } else {
+                    entry.username = "unknown";
+                }
                 entry.ip_address = j["ip_address"];
                 entry.log_level = j["log_level"];
                 entry.message = j.value("message", "");
@@ -87,7 +94,14 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
                     
                     LogEntry entry;
                     entry.timestamp = LogEntry::parse_timestamp(log["timestamp"]);
-                    entry.username = log["username"];
+                    if (log.contains("user_id")) {
+                        // Convert user_id to string
+                        entry.username = "user_" + std::to_string(log["user_id"].get<int>());
+                    } else if (log.contains("username")) {
+                        entry.username = log["username"].get<std::string>();
+                    } else {
+                        entry.username = "unknown";
+                    }
                     entry.ip_address = log["ip_address"];
                     entry.log_level = log["log_level"];
                     entry.message = log.value("message", "");
@@ -108,7 +122,14 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
                     
                     LogEntry entry;
                     entry.timestamp = LogEntry::parse_timestamp(log["timestamp"]);
-                    entry.username = log["username"];
+                    if (log.contains("user_id")) {
+                        // Convert user_id to string
+                        entry.username = "user_" + std::to_string(log["user_id"].get<int>());
+                    } else if (log.contains("username")) {
+                        entry.username = log["username"].get<std::string>();
+                    } else {
+                        entry.username = "unknown";
+                    }
                     entry.ip_address = log["ip_address"];
                     entry.log_level = log["log_level"];
                     entry.message = log.value("message", "");

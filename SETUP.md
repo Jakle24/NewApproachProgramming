@@ -1,114 +1,37 @@
-Log Analysis System
-A multi-threaded C++ server-client application for processing and analyzing log files.
+Simple Guide: Using Your Log Parser
 
-Setup Instructions
+1. Compile the Test Parser
 
+cl /EHsc /std:c++17 test_parser.cpp src\LogEntry.cpp /I"include" /Fe:test_parser.exe
 
-Prerequisites
+2. Parse JSON Files
 
-Windows OS
-Visual Studio C++ Build Tools (MSVC compiler)
-LogFiles.zip containing your log data
+.\test_parser.exe "Logs\logs\client#1\log_file.json" json
 
-Quick Start
-1. Clone the repository
+This will display the parsed contents of the JSON file.
 
-git clone https://github.com/yourusername/NewApproachProgramming.git
-cd NewApproachProgramming
+3. Parse TXT Files 
 
-2. Place log files
+.\test_parser.exe "Logs\logs\client#2\log_file.txt" txt
 
-Download LogFiles.zip
-Place it in the project root directory
-Extract using the included script:
+4. Parse XML Files 
 
-extract_logs.bat
+.\test_parser.exe "Logs\logs\client#3\log_file.xml" xml
 
-3. Build the application
+5. Test with Different Clients
+Try parsing logs from different client folders:
 
-Open a Developer Command Prompt for Visual Studio
-Run:
+.\test_parser.exe "Logs\logs\client#1\log_file.json" json
+.\test_parser.exe "Logs\logs\client#2\log_file.json" json
+.\test_parser.exe "Logs\logs\client#3\log_file.json" json
 
-cl /EHsc /std:c++17 src\*.cpp ws2_32.lib /I. /Fe:NewApproachProgramming.exe
+6. View All Available Log Files
+To see what log files are available:
 
-4. Run the server
-
-NewApproachProgramming.exe server
-
-5. Run the client (in a separate terminal)
-
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user
+Get-ChildItem -Path "Logs\logs" -Recurse -File | Where-Object {$_.Extension -match "json|txt|xml"}
 
 
-Available Analysis Types
-
-user - Analyze logs by username
-ip - Analyze logs by IP address
-level - Analyze logs by severity level
+This will help you identify all the log files you can parse.
 
 
-Command Examples
-
-# User analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user
-
-# IP analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis ip
-
-# Log level analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis level
-
-# With date filtering
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user --start "2023-01-01 00:00:00" --end "2023-12-31 23:59:59"
-
-
-
-Project Structure
-src - Source code files
-LogFiles - Extracted log files for analysis
-nlohmann - JSON library for C++
-extract_logs.bat - Script to extract log files from zip
-
-
-Troubleshooting
-Ensure you're using the Visual Studio Developer Command Prompt when building
-Verify that LogFiles.zip has been extracted correctly
-Start the server before running any client commands
-
-
-
-
-
-QUICK USE
-
-Client Mode
-The client mode is used for analyzing log files with several required and optional parameters:
-
-Basic Usage
-
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
-
-
-Analysis Types
-You can specify one of three analysis types:
-
-# For user-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
-
-# For IP-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis ip
-
-# For level-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis level
-
-Date Filtering
-To analyze logs within a specific date range:
-
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user --start "2025-05-01 00:00:00" --end "2025-05-14 23:59:59"
-
-
-Tips
-Use quotes around folder paths that contain spaces
-Date format must be 'YYYY-MM-DD HH:MM:SS'
-You can use just the start date without the end date (or vice versa)
-Make sure the log folder path points to a directory containing valid log files
+"Redundant" files are my old versions which I have kept in here to show what I was working on. Sadly I ran into so many issues and had to somewhat start again. I wanted to keep the code in here to show was I was attempting to do to match the brief. I know I was close with getting it working. It ended up having connection issues between all the files in the src folder. Files outside, with some exceptions, were used in my final version. 
