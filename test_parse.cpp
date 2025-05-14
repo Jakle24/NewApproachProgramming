@@ -1,38 +1,51 @@
-#include "src/LogProcessor.hpp"
+// test_parser.cpp - Simplified log parser to avoid Norton issues
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+#include "src/LogEntry.hpp"
+#include "src/LogProcessor.hpp"
 
-int main() {
-    // Create a LogProcessor instance
-    LogProcessor processor(".");  // Current directory, not used for direct file parsing
+int main(int argc, char* argv[]) {
+    if (argc < 3) {
+        std::cout << "Usage: test_parser <file_path> <file_type>\n";
+        std::cout << "  file_type can be: json, txt, or xml\n";
+        return 1;
+    }
+
+    std::string file_path = argv[1];
+    std::string file_type = argv[2];
     
-    // Path to your JSON file
-    std::string json_path = "TestLog/single_log.json";
+    LogProcessor processor(".");
+    std::vector<LogEntry> entries;
     
-    // Parse the JSON file
-    std::vector<LogEntry> logs = processor.parse_json(json_path);
-    
-    // Check if parsing was successful
-    if (logs.empty()) {
-        std::cout << "Failed to parse any logs from the file." << std::endl;
+    // Parse based on file type
+    if (file_type == "json") {
+        entries = processor.parse_json(file_path);
+    } else if (file_type == "txt") {
+        entries = processor.parse_txt(file_path);
+    } else if (file_type == "xml") {
+        entries = processor.parse_xml(file_path);
+    } else {
+        std::cout << "Unknown file type: " << file_type << "\n";
         return 1;
     }
     
-    // Display the parsed log entry
-    std::cout << "Successfully parsed " << logs.size() << " log entries." << std::endl;
+    // Display parsed entries
+    std::cout << "Successfully parsed " << entries.size() << " entries.\n\n";
     
-    // Display the first log entry's details
-    const LogEntry& log = logs[0];
-    auto time_t_point = std::chrono::system_clock::to_time_t(log.timestamp);
-    std::tm tm = {};
-    localtime_s(&tm, &time_t_point);
-    std::cout << "Timestamp: ";
-    std::cout << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << std::endl;
-    std::cout << "Username: " << log.username << std::endl;
-    std::cout << "IP Address: " << log.ip_address << std::endl;
-    std::cout << "Log Level: " << log.log_level << std::endl;
-    std::cout << "Message: " << log.message << std::endl;
-    std::cout << "Response Time: " << log.response_time << " ms" << std::endl;
+    for (const auto& entry : entries) {
+        auto time_t_point = std::chrono::system_clock::to_time_t(entry.timestamp);
+        std::tm tm = {};
+        localtime_s(&tm, &time_t_point);
+        
+        std::cout << "------------------------------------\n";
+        std::cout << "Timestamp: " << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << "\n";
+        std::cout << "Username: " << entry.username << "\n";
+        std::cout << "IP Address: " << entry.ip_address << "\n";
+        std::cout << "Log Level: " << entry.log_level << "\n";
+        std::cout << "Message: " << entry.message << "\n";
+        std::cout << "Response Time: " << entry.response_time << " ms\n";
+    }
     
     return 0;
 }
