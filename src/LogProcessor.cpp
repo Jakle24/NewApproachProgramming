@@ -92,21 +92,6 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
     return entries;
 }
 
-// debug-heavy load_logs
-std::vector<LogEntry> LogProcessor::load_logs(const std::optional<DateRange>& date_range) {
-    std::vector<LogEntry> all;
-    std::cout << "→ [LogProcessor] scanning folder: " << log_folder << "\n";
-    for (auto& e : std::filesystem::recursive_directory_iterator(log_folder)) {
-        if (!e.is_regular_file()) continue;
-        auto path = e.path().string();
-        auto ext  = e.path().extension().string();
-        std::cout << "   Found file: " << path << " (" << ext << ")\n";
-        // call parse_json/parse_txt/parse_xml based on ext…
-        // push into all…
-    }
-    std::cout << "→ loaded " << all.size() << " entries\n";
-    return all;
-}
 
 // Implement in LogProcessor.cpp
 std::vector<LogEntry> LogProcessor::parse_xml(const std::string& filepath) {
