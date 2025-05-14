@@ -103,7 +103,12 @@ void TCPServer::handle_client(SOCKET client_socket) {
         json request = json::parse(request_str);
 
         std::string analysis_type = request["analysis_type"];
-        std::string log_folder = request["log_folder"];
+        std::string folder = request["log_folder"];
+
+        {   // debug:
+            std::lock_guard<std::mutex> lk(cout_mutex);
+            std::cout << "→ Log folder from client: " << folder << "\n";
+        }
 
         // Parse date range
         std::string start_date = request.value("start_date", "");
@@ -121,10 +126,11 @@ void TCPServer::handle_client(SOCKET client_socket) {
             date_range = DateRange{start_tp, end_tp};
         }
 
-        // Process logs
-        LogProcessor processor(log_folder);
+        // Construct the processor with the folder:
+        LogProcessor processor(folder);
+
+        // Now call the right analysis:
         json result;
-        
         if (analysis_type == "user") {
             result = processor.analyze_by_user(date_range);
         } else if (analysis_type == "ip") {

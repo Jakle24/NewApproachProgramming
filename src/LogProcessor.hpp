@@ -32,8 +32,10 @@ public:
      * @brief Constructs a LogProcessor that processes logs from the specified folder
      * @param log_folder Directory path containing log files to analyze
      */
-    LogProcessor(const std::string& log_folder);
-    
+    explicit LogProcessor(const std::string& folder)
+      : log_folder(folder) 
+    {}
+
     /**
      * @brief Analyzes logs grouped by username
      * @param date_range Optional time range to filter logs
