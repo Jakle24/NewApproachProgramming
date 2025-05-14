@@ -127,49 +127,55 @@ int main(int argc, char* argv[]) {
     send(sock, requestStr.c_str(), requestStr.size(), 0);
     
     // Receive response
-    char buffer[65536]; // Larger buffer for potentially large responses
-    int bytesReceived = recv(sock, buffer, 65536, 0);
-    std::cout << "DEBUG: Bytes received: " << bytesReceived << std::endl;
-    if (bytesReceived > 0) {
-        buffer[bytesReceived] = '\0';
-        std::cout << "DEBUG: Response preview: " << std::string(buffer).substr(0, 100) << "..." << std::endl;
-        
-        // Parse and display results
-        nlohmann::json response = nlohmann::json::parse(buffer);
-        
-        if (mode == "--analysis") {
-            // Display analysis results
-            std::cout << "\n=== Analysis Results ===\n\n";
-            std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+    std::string total_response;
+    char buffer[4096];
+    int bytesReceived;
+
+    // Keep receiving until no more data
+    do {
+        bytesReceived = recv(sock, buffer, sizeof(buffer), 0);
+        if (bytesReceived > 0) {
+            total_response.append(buffer, bytesReceived);
         }
-        else if (mode == "--parse") {
-            // Display parsing results
-            if (response.contains("status") && response["status"] == "success") {
-                std::cout << "\n=== Parsing Results ===\n";
-                std::cout << "Successfully parsed " << response["count"].get<int>() << " entries\n\n";
+    } while (bytesReceived > 0);
+
+    std::cout << "DEBUG: Total bytes received: " << total_response.size() << std::endl;
+
+    // Then parse the complete response
+    nlohmann::json response = nlohmann::json::parse(total_response);
+    
+    if (mode == "--analysis") {
+        // Display analysis results
+        std::cout << "\n=== Analysis Results ===\n\n";
+        std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+    }
+    else if (mode == "--parse") {
+        // Display parsing results
+        if (response.contains("status") && response["status"] == "success") {
+            std::cout << "\n=== Parsing Results ===\n";
+            std::cout << "Successfully parsed " << response["count"].get<int>() << " entries\n\n";
+            
+            // Display first few entries
+            int entries_size = static_cast<int>(response["entries"].size());
+            int display_count = (entries_size < 5) ? entries_size : 5;
+            for (int i = 0; i < display_count; i++) {
+                const auto& entry = response["entries"][i];
                 
-                // Display first few entries
-                int entries_size = static_cast<int>(response["entries"].size());
-                int display_count = (entries_size < 5) ? entries_size : 5;
-                for (int i = 0; i < display_count; i++) {
-                    const auto& entry = response["entries"][i];
-                    
-                    std::cout << "------------------------------------\n";
-                    std::cout << "Timestamp: " << entry["timestamp"].get<std::string>() << "\n";
-                    std::cout << "Username: " << entry["username"].get<std::string>() << "\n";
-                    std::cout << "IP Address: " << entry["ip_address"].get<std::string>() << "\n";
-                    std::cout << "Log Level: " << entry["log_level"].get<std::string>() << "\n";
-                    std::cout << "Message: " << entry["message"].get<std::string>() << "\n";
-                }
-                
-                if (display_count < (int)response["entries"].size()) {
-                    std::cout << "\n... and " << (response["entries"].size() - display_count) 
-                              << " more entries\n";
-                }
+                std::cout << "------------------------------------\n";
+                std::cout << "Timestamp: " << entry["timestamp"].get<std::string>() << "\n";
+                std::cout << "Username: " << entry["username"].get<std::string>() << "\n";
+                std::cout << "IP Address: " << entry["ip_address"].get<std::string>() << "\n";
+                std::cout << "Log Level: " << entry["log_level"].get<std::string>() << "\n";
+                std::cout << "Message: " << entry["message"].get<std::string>() << "\n";
             }
-            else {
-                std::cout << "Error: " << response["message"].get<std::string>() << std::endl;
+            
+            if (display_count < (int)response["entries"].size()) {
+                std::cout << "\n... and " << (response["entries"].size() - display_count) 
+                          << " more entries\n";
             }
+        }
+        else {
+            std::cout << "Error: " << response["message"].get<std::string>() << std::endl;
         }
     }
     
