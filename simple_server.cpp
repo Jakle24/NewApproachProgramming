@@ -1,3 +1,11 @@
+// simple_server.cpp - Multithreaded log parsing server
+// Handles client requests to parse different log file formats (JSON, TXT)
+// Key components:
+// - ParsedLogEntry struct: Holds structured log data
+// - parse_json_file/parse_txt_file: Format-specific parsers
+// - handleClient: Connection handler for client requests
+// - main: Socket setup and request dispatching
+
 #include <iostream>
 #include <string>
 #include <thread>
@@ -10,6 +18,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mutex>
+#include <map>
+#include <filesystem>
 // Include any other necessary headers
 
 #pragma comment(lib, "ws2_32.lib")
@@ -144,6 +154,126 @@ std::vector<ParsedLogEntry> parse_txt_file(const std::string& filepath) {
     return entries;
 }
 
+// Analyze logs by IP address
+nlohmann::json analyze_by_ip(const std::string& log_folder) {
+    nlohmann::json result;
+    std::map<std::string, int> ip_counts;
+    
+    // Process log files in the folder
+    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
+        std::string file_path = entry.path().string();
+        std::string extension = entry.path().extension().string();
+        
+        std::vector<ParsedLogEntry> logs;
+        if (extension == ".json") {
+            logs = parse_json_file(file_path);
+        } 
+        else if (extension == ".txt") {
+            logs = parse_txt_file(file_path);
+        }
+        
+        // Count occurrences of each IP
+        for (const auto& log : logs) {
+            ip_counts[log.ip_address]++;
+        }
+    }
+    
+    // Create analysis result
+    result["status"] = "success";
+    result["analysis_type"] = "ip";
+    
+    nlohmann::json ip_stats = nlohmann::json::array();
+    for (const auto& [ip, count] : ip_counts) {
+        ip_stats.push_back({
+            {"ip_address", ip},
+            {"count", count}
+        });
+    }
+    
+    result["ip_statistics"] = ip_stats;
+    return result;
+}
+
+// Analyze logs by user activity
+nlohmann::json analyze_by_user(const std::string& log_folder) {
+    nlohmann::json result;
+    std::map<std::string, int> user_counts;
+    
+    // Process log files in the folder
+    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
+        std::string file_path = entry.path().string();
+        std::string extension = entry.path().extension().string();
+        
+        std::vector<ParsedLogEntry> logs;
+        if (extension == ".json") {
+            logs = parse_json_file(file_path);
+        } 
+        else if (extension == ".txt") {
+            logs = parse_txt_file(file_path);
+        }
+        
+        // Count occurrences of each username
+        for (const auto& log : logs) {
+            user_counts[log.username]++;
+        }
+    }
+    
+    // Create analysis result
+    result["status"] = "success";
+    result["analysis_type"] = "user";
+    
+    nlohmann::json user_stats = nlohmann::json::array();
+    for (const auto& [username, count] : user_counts) {
+        user_stats.push_back({
+            {"username", username},
+            {"count", count}
+        });
+    }
+    
+    result["user_statistics"] = user_stats;
+    return result;
+}
+
+// Analyze logs by severity level
+nlohmann::json analyze_by_level(const std::string& log_folder) {
+    nlohmann::json result;
+    std::map<std::string, int> level_counts;
+    
+    // Process log files in the folder
+    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
+        std::string file_path = entry.path().string();
+        std::string extension = entry.path().extension().string();
+        
+        std::vector<ParsedLogEntry> logs;
+        if (extension == ".json") {
+            logs = parse_json_file(file_path);
+        } 
+        else if (extension == ".txt") {
+            logs = parse_txt_file(file_path);
+        }
+        
+        // Count occurrences of each log level
+        for (const auto& log : logs) {
+            level_counts[log.log_level]++;
+        }
+    }
+    
+    // Create analysis result
+    result["status"] = "success";
+    result["analysis_type"] = "level";
+    
+    nlohmann::json level_stats = nlohmann::json::array();
+    for (const auto& [level, count] : level_counts) {
+        level_stats.push_back({
+            {"level", level},
+            {"count", count}
+        });
+    }
+    
+    result["level_statistics"] = level_stats;
+    return result;
+}
+
 // Define a function to handle clients
 void handleClient(SOCKET clientSocket) {
     char buffer[4096];
@@ -162,7 +292,7 @@ void handleClient(SOCKET clientSocket) {
         // Extract request details
         std::string request_type = request.value("request_type", "");
         
-        // Handle parse requests
+        // Handle different request types
         if (request_type == "parse") {
             std::string file_path = request.value("file_path", "");
             std::string file_type = request.value("file_type", "");
@@ -228,6 +358,33 @@ void handleClient(SOCKET clientSocket) {
                 }
             }
         }
+        else if (request_type == "analysis") {
+            std::string log_folder = request.value("log_folder", "");
+            std::string analysis_type = request.value("analysis_type", "");
+            
+            std::cout << "Processing analysis request for " << log_folder << " (" << analysis_type << ")" << std::endl;
+            
+            if (log_folder.empty() || analysis_type.empty()) {
+                response["status"] = "error";
+                response["message"] = "Missing log_folder or analysis_type";
+            }
+            else {
+                // Perform requested analysis
+                if (analysis_type == "ip") {
+                    response = analyze_by_ip(log_folder);
+                }
+                else if (analysis_type == "user") {
+                    response = analyze_by_user(log_folder);
+                }
+                else if (analysis_type == "level") {
+                    response = analyze_by_level(log_folder);
+                }
+                else {
+                    response["status"] = "error";
+                    response["message"] = "Unsupported analysis type: " + analysis_type;
+                }
+            }
+        }
         else {
             response["status"] = "error";
             response["message"] = "Unknown request type: " + request_type;
@@ -244,7 +401,7 @@ void handleClient(SOCKET clientSocket) {
     closesocket(clientSocket);
 }
 
-// Main function - this was likely missing or incorrect
+// Main function
 int main() {
     // Initialize Winsock
     WSADATA wsData;

@@ -1,9 +1,18 @@
+// simple_client.cpp - Log analysis client application
+// Sends parsing requests to server and displays results
+// Key components:
+// - Command line arg processing for different modes
+// - Socket communication with parsing server
+// - JSON request formatting
+// - Response handling and display formatting
+
 #include <iostream>
 #include <string>
 #include <nlohmann/json.hpp>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <algorithm>
+#include <map>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -11,6 +20,60 @@ void printUsage() {
     std::cout << "Usage:\n";
     std::cout << "  For analysis: simple_client --analysis --log-folder <folder> --type <user|ip|level>\n";
     std::cout << "  For parsing:  simple_client --parse --file <path> --type <json|txt>\n";
+}
+
+// Add to analyze log levels
+void analyze_log_levels(const nlohmann::json& response) {
+    std::map<std::string, int> level_counts;
+    
+    for (const auto& entry : response["entries"]) {
+        std::string level = entry["log_level"];
+        level_counts[level]++;
+    }
+    
+    std::cout << "\n=== Log Level Analysis ===\n";
+    for (const auto& [level, count] : level_counts) {
+        std::cout << level << ": " << count << " entries\n";
+    }
+}
+
+// Add to analyze timestamps
+void analyze_timestamps(const nlohmann::json& response) {
+    std::map<std::string, int> date_counts;
+    
+    for (const auto& entry : response["entries"]) {
+        std::string timestamp = entry["timestamp"].get<std::string>();
+        std::string date = timestamp.substr(0, 10); // Get just the date part
+        date_counts[date]++;
+    }
+    
+    std::cout << "\n=== Date Distribution Analysis ===\n";
+    for (const auto& [date, count] : date_counts) {
+        std::cout << date << ": " << count << " entries\n";
+    }
+}
+
+// Add to analyze top active users
+void analyze_users(const nlohmann::json& response) {
+    std::map<std::string, int> user_counts;
+    
+    for (const auto& entry : response["entries"]) {
+        std::string username = entry["username"];
+        user_counts[username]++;
+    }
+    
+    std::cout << "\n=== Top 5 Active Users ===\n";
+    
+    // Create vector of pairs for sorting
+    std::vector<std::pair<std::string, int>> user_pairs(user_counts.begin(), user_counts.end());
+    std::sort(user_pairs.begin(), user_pairs.end(), 
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    int count = 0;
+    for (const auto& [user, entries] : user_pairs) {
+        if (count++ >= 5) break;
+        std::cout << user << ": " << entries << " entries\n";
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -148,6 +211,15 @@ int main(int argc, char* argv[]) {
         // Display analysis results
         std::cout << "\n=== Analysis Results ===\n\n";
         std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+
+        // Analyze log levels
+        analyze_log_levels(response);
+
+        // Analyze timestamps
+        analyze_timestamps(response);
+
+        // Analyze top active users
+        analyze_users(response);
     }
     else if (mode == "--parse") {
         // Display parsing results

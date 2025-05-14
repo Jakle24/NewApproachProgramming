@@ -1,3 +1,10 @@
+// test_parse.cpp - Standalone log file parser
+// Direct parsing of log files for testing and development
+// Key components:
+// - LogEntry struct: Standard log entry representation
+// - parse_json_file/parse_txt_file: Format-specific parsers
+// - main: File processing and result display
+
 #include <iostream>
 #include <string>
 #include <vector>

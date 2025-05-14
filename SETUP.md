@@ -1,49 +1,40 @@
-Simple Guide: Using Your Log Parser
+Use compile_env.bat to navigate compilation process. Ensure regluar cleaning to make sure everything is updated upon use. 
+Then use commands that direct to logfiles.
 
-1. Compile the Test Parser
+**Sample Client Commands
 
-cd C:\Users\ethan\OneDrive\Documents\GitHub\NewApproachProgramming
+## Basic Parsing Commands
 
-cl /EHsc /std:c++17 test_parser.cpp src\LogEntry.cpp /I"include" /Fe:test_parser.exe
+# Parse JSON log file
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.json" --type json
 
-**SERVER SETUP INSTRUCTIONS**
+# Parse TXT log file
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.txt" --type txt
 
-Server: .\simple_server.exe
-You should see: "Server started on port 8080"
-
-Run the Client (in a separate command window)
-For user analysis:
-Client: simple_client.exe --log-folder "Logs\logs" --analysis user
-
-
-2. Parse JSON Files
-
-.\test_parser.exe "Logs\logs\client#1\log_file.json" json
-
-This will display the parsed contents of the JSON file.
-
-3. Parse TXT Files 
-
-.\test_parser.exe "Logs\logs\client#2\log_file.txt" txt
-
-4. Parse XML Files 
-
-.\test_parser.exe "Logs\logs\client#3\log_file.xml" xml
-
-5. Test with Different Clients
-Try parsing logs from different client folders:
-
-.\test_parser.exe "Logs\logs\client#1\log_file.json" json
-.\test_parser.exe "Logs\logs\client#2\log_file.json" json
-.\test_parser.exe "Logs\logs\client#3\log_file.json" json
-
-6. View All Available Log Files
-To see what log files are available:
-
-Get-ChildItem -Path "Logs\logs" -Recurse -File | Where-Object {$_.Extension -match "json|txt|xml"}
+# Parse logs from different clients
+.\simple_client.exe --parse --file "Logs\logs\client#2\log_file.json" --type json
+.\simple_client.exe --parse --file "Logs\logs\client#3\log_file.txt" --type txt
 
 
-This will help you identify all the log files you can parse.
+## Analysis Commands (When Implemented)
+
+# Analyze logs by user activity
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type user
+
+# Analyze logs by IP address
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type ip
+
+# Analyze logs by severity level
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type level
 
 
-"Redundant" files are my old versions which I have kept in here to show what I was working on. Sadly I ran into so many issues and had to somewhat start again. I wanted to keep the code in here to show was I was attempting to do to match the brief. I know I was close with getting it working. It ended up having connection issues between all the files in the src folder. Files outside, with some exceptions, were used in my final version. 
+## Advanced Usage
+
+# Analyze specific client's logs
+.\simple_client.exe --analysis --log-folder "Logs\logs\client#1" --type user
+
+# Parse custom log file
+.\simple_client.exe --parse --file "path\to\your\custom_log.json" --type json
+
+# Run with output redirection to save results
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.json" --type json > results.txt
