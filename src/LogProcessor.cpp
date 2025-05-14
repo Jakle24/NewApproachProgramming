@@ -92,51 +92,20 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
     return entries;
 }
 
+// debug-heavy load_logs
 std::vector<LogEntry> LogProcessor::load_logs(const std::optional<DateRange>& date_range) {
-    std::vector<LogEntry> all_logs;
-    std::cout << "Loading logs from: " << log_folder << std::endl;
-    
-    try {
-        // Use recursive directory traversal to find all log files
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(log_folder)) {
-            if (entry.is_regular_file()) {
-                std::string filepath = entry.path().string();
-                std::string ext = entry.path().extension().string();
-                std::cout << "Found file: " << filepath << " with extension " << ext << std::endl;
-                
-                // Process all three required formats
-                std::vector<LogEntry> file_logs;
-                if (ext == ".json") {
-                    file_logs = parse_json(filepath);
-                } 
-                else if (ext == ".txt") {
-                    file_logs = parse_txt(filepath);
-                }
-                else if (ext == ".xml") {
-                    // Use a basic implementation for XML
-                    std::cout << "XML parsing not implemented, skipping: " << filepath << std::endl;
-                }
-                
-                // Apply date filter if provided
-                if (date_range) {
-                    std::vector<LogEntry> filtered_logs;
-                    for (const auto& log : file_logs) {
-                        if (log.timestamp >= date_range->start && log.timestamp <= date_range->end) {
-                            filtered_logs.push_back(log);
-                        }
-                    }
-                    all_logs.insert(all_logs.end(), filtered_logs.begin(), filtered_logs.end());
-                } else {
-                    all_logs.insert(all_logs.end(), file_logs.begin(), file_logs.end());
-                }
-            }
-        }
-    } catch (const std::filesystem::filesystem_error& e) {
-        std::cerr << "Error loading logs: " << e.what() << std::endl;
+    std::vector<LogEntry> all;
+    std::cout << "→ [LogProcessor] scanning folder: " << log_folder << "\n";
+    for (auto& e : std::filesystem::recursive_directory_iterator(log_folder)) {
+        if (!e.is_regular_file()) continue;
+        auto path = e.path().string();
+        auto ext  = e.path().extension().string();
+        std::cout << "   Found file: " << path << " (" << ext << ")\n";
+        // call parse_json/parse_txt/parse_xml based on ext…
+        // push into all…
     }
-    
-    std::cout << "Loaded " << all_logs.size() << " log entries" << std::endl;
-    return all_logs;
+    std::cout << "→ loaded " << all.size() << " entries\n";
+    return all;
 }
 
 // Implement in LogProcessor.cpp
