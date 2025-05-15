@@ -14,7 +14,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
-#include <nlohmann::json.hpp>
+#include <nlohmann/json.hpp>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mutex>
@@ -152,6 +152,41 @@ std::vector<ParsedLogEntry> parse_txt_file(const std::string& filepath) {
     
     std::cout << "Parsed " << success_count << " entries from TXT file" << std::endl;
     return entries;
+}
+
+// Function to recursively collect logs from a directory and its subdirectories
+std::vector<ParsedLogEntry> collect_logs_recursive(const std::string& folder_path) {
+    std::vector<ParsedLogEntry> all_logs;
+    
+    try {
+        // Recursive directory traversal
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(folder_path)) {
+            if (!entry.is_directory()) {
+                std::string ext = entry.path().extension().string();
+                std::string filepath = entry.path().string();
+                
+                std::cout << "Processing file: " << filepath << " (Extension: " << ext << ")" << std::endl;
+                
+                std::vector<ParsedLogEntry> file_logs;
+                if (ext == ".json") {
+                    file_logs = parse_json_file(filepath);
+                } 
+                else if (ext == ".txt") {
+                    file_logs = parse_txt_file(filepath);
+                }
+                // Add XML support later if needed
+                
+                std::cout << "  Found " << file_logs.size() << " log entries" << std::endl;
+                all_logs.insert(all_logs.end(), file_logs.begin(), file_logs.end());
+            }
+        }
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "Error collecting logs: " << e.what() << std::endl;
+    }
+    
+    std::cout << "Total logs collected: " << all_logs.size() << std::endl;
+    return all_logs;
 }
 
 // Analyze logs by user
@@ -313,18 +348,8 @@ void handleClient(SOCKET clientSocket) {
                 }
             }
 
-            // Load all log files from the folder
-            std::vector<ParsedLogEntry> all_logs;
-            for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
-                if (entry.path().extension() == ".json") {
-                    auto logs = parse_json_file(entry.path().string());
-                    all_logs.insert(all_logs.end(), logs.begin(), logs.end());
-                } 
-                else if (entry.path().extension() == ".txt") {
-                    auto logs = parse_txt_file(entry.path().string());
-                    all_logs.insert(all_logs.end(), logs.begin(), logs.end());
-                }
-            }
+            // Load all log files from the folder recursively
+            std::vector<ParsedLogEntry> all_logs = collect_logs_recursive(log_folder);
             
             // Perform requested analysis
             if (analysis_type == "user") {
