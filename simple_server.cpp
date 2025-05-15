@@ -14,7 +14,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
-#include <nlohmann/json.hpp>
+#include <nlohmann::json.hpp>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mutex>
@@ -154,231 +154,66 @@ std::vector<ParsedLogEntry> parse_txt_file(const std::string& filepath) {
     return entries;
 }
 
-/*
-// XML parser function
-// Note: This implementation is commented out as it requires the tinyxml2 library
-// Uncomment the following code if you want to enable XML parsing (TESTING ONLY, NOT CONSISTENT)
-std::vector<ParsedLogEntry> parse_xml_file(const std::string& filepath) {
-    std::vector<ParsedLogEntry> entries;
-    
-    // Load XML file
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLError result = doc.LoadFile(filepath.c_str());
-    
-    if (result != tinyxml2::XML_SUCCESS) {
-        std::cerr << "Failed to load XML file: " << filepath << std::endl;
-        return entries;
-    }
-    
-    // Get root element
-    tinyxml2::XMLElement* root = doc.RootElement();
-    if (!root) {
-        std::cerr << "XML file has no root element" << std::endl;
-        return entries;
-    }
-    
-    // Check if root is "logs"
-    if (std::string(root->Name()) != "logs") {
-        std::cerr << "XML root element is not 'logs'" << std::endl;
-        return entries;
-    }
-    
-    // Iterate through log entries
-    int success_count = 0;
-    for (tinyxml2::XMLElement* logElement = root->FirstChildElement("log");
-         logElement;
-         logElement = logElement->NextSiblingElement("log")) {
-        
-        try {
-            ParsedLogEntry entry;
-            
-            // Parse timestamp
-            tinyxml2::XMLElement* timestampElement = logElement->FirstChildElement("timestamp");
-            if (timestampElement && timestampElement->GetText()) {
-                entry.timestamp = ParsedLogEntry::parse_timestamp(timestampElement->GetText());
-            } else {
-                // Default timestamp if not found
-                entry.timestamp = std::chrono::system_clock::now();
-            }
-            
-            // Parse username (might be user_id in some formats)
-            tinyxml2::XMLElement* userElement = logElement->FirstChildElement("username");
-            if (userElement && userElement->GetText()) {
-                entry.username = userElement->GetText();
-            } else {
-                // Try user_id instead
-                userElement = logElement->FirstChildElement("user_id");
-                if (userElement && userElement->GetText()) {
-                    entry.username = "user_" + std::string(userElement->GetText());
-                } else {
-                    entry.username = "unknown";
-                }
-            }
-            
-            // Parse IP address
-            tinyxml2::XMLElement* ipElement = logElement->FirstChildElement("ip_address");
-            if (ipElement && ipElement->GetText()) {
-                entry.ip_address = ipElement->GetText();
-            } else {
-                entry.ip_address = "0.0.0.0";
-            }
-            
-            // Parse log level
-            tinyxml2::XMLElement* levelElement = logElement->FirstChildElement("log_level");
-            if (levelElement && levelElement->GetText()) {
-                entry.log_level = levelElement->GetText();
-            } else {
-                entry.log_level = "INFO";
-            }
-            
-            // Parse message
-            tinyxml2::XMLElement* messageElement = logElement->FirstChildElement("message");
-            if (messageElement && messageElement->GetText()) {
-                entry.message = messageElement->GetText();
-            } else {
-                entry.message = "";
-            }
-            
-            // Parse response time (optional)
-            tinyxml2::XMLElement* rtElement = logElement->FirstChildElement("response_time");
-            if (rtElement && rtElement->GetText()) {
-                try {
-                    entry.response_time = std::stod(rtElement->GetText());
-                } catch (const std::exception&) {
-                    entry.response_time = 0.0;
-                }
-            }
-            
-            entries.push_back(entry);
-            success_count++;
-            
-        } catch (const std::exception& e) {
-            std::cerr << "Error parsing XML log entry: " << e.what() << std::endl;
-        }
-    }
-    
-    std::cout << "Parsed " << success_count << " entries from XML file" << std::endl;
-    return entries;
-}
-*/
-
-// Analyze logs by IP address
-nlohmann::json analyze_by_ip(const std::string& log_folder) {
-    nlohmann::json result;
-    std::map<std::string, int> ip_counts;
-    
-    // Process log files in the folder
-    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
-        std::string file_path = entry.path().string();
-        std::string extension = entry.path().extension().string();
-        
-        std::vector<ParsedLogEntry> logs;
-        if (extension == ".json") {
-            logs = parse_json_file(file_path);
-        } 
-        else if (extension == ".txt") {
-            logs = parse_txt_file(file_path);
-        }
-        
-        // Count occurrences of each IP
-        for (const auto& log : logs) {
-            ip_counts[log.ip_address]++;
-        }
-    }
-    
-    // Create analysis result
-    result["status"] = "success";
-    result["analysis_type"] = "ip";
-    
-    nlohmann::json ip_stats = nlohmann::json::array();
-    for (const auto& [ip, count] : ip_counts) {
-        ip_stats.push_back({
-            {"ip_address", ip},
-            {"count", count}
-        });
-    }
-    
-    result["ip_statistics"] = ip_stats;
-    return result;
-}
-
-// Analyze logs by user activity
-nlohmann::json analyze_by_user(const std::string& log_folder) {
-    nlohmann::json result;
+// Analyze logs by user
+nlohmann::json analyze_by_user(const std::vector<ParsedLogEntry>& logs) {
     std::map<std::string, int> user_counts;
     
-    // Process log files in the folder
-    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
-        std::string file_path = entry.path().string();
-        std::string extension = entry.path().extension().string();
-        
-        std::vector<ParsedLogEntry> logs;
-        if (extension == ".json") {
-            logs = parse_json_file(file_path);
-        } 
-        else if (extension == ".txt") {
-            logs = parse_txt_file(file_path);
-        }
-        
-        // Count occurrences of each username
-        for (const auto& log : logs) {
-            user_counts[log.username]++;
-        }
+    // Count entries per user
+    for (const auto& entry : logs) {
+        user_counts[entry.username]++;
     }
     
-    // Create analysis result
-    result["status"] = "success";
-    result["analysis_type"] = "user";
-    
-    nlohmann::json user_stats = nlohmann::json::array();
-    for (const auto& [username, count] : user_counts) {
-        user_stats.push_back({
-            {"username", username},
-            {"count", count}
-        });
+    // Create result array
+    nlohmann::json result = nlohmann::json::array();
+    for (const auto& [user, count] : user_counts) {
+        nlohmann::json user_stat;
+        user_stat["username"] = user;
+        user_stat["count"] = count;
+        result.push_back(user_stat);
     }
     
-    result["user_statistics"] = user_stats;
     return result;
 }
 
-// Analyze logs by severity level
-nlohmann::json analyze_by_level(const std::string& log_folder) {
-    nlohmann::json result;
+// Analyze logs by IP address
+nlohmann::json analyze_by_ip(const std::vector<ParsedLogEntry>& logs) {
+    std::map<std::string, int> ip_counts;
+    
+    // Count requests per IP
+    for (const auto& entry : logs) {
+        ip_counts[entry.ip_address]++;
+    }
+    
+    // Create result array
+    nlohmann::json result = nlohmann::json::array();
+    for (const auto& [ip, count] : ip_counts) {
+        nlohmann::json ip_stat;
+        ip_stat["ip_address"] = ip;
+        ip_stat["count"] = count;
+        result.push_back(ip_stat);
+    }
+    
+    return result;
+}
+
+// Analyze logs by log level
+nlohmann::json analyze_by_level(const std::vector<ParsedLogEntry>& logs) {
     std::map<std::string, int> level_counts;
     
-    // Process log files in the folder
-    for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
-        std::string file_path = entry.path().string();
-        std::string extension = entry.path().extension().string();
-        
-        std::vector<ParsedLogEntry> logs;
-        if (extension == ".json") {
-            logs = parse_json_file(file_path);
-        } 
-        else if (extension == ".txt") {
-            logs = parse_txt_file(file_path);
-        }
-        
-        // Count occurrences of each log level
-        for (const auto& log : logs) {
-            level_counts[log.log_level]++;
-        }
+    // Count entries per log level
+    for (const auto& entry : logs) {
+        level_counts[entry.log_level]++;
     }
     
-    // Create analysis result
-    result["status"] = "success";
-    result["analysis_type"] = "level";
-    
-    nlohmann::json level_stats = nlohmann::json::array();
+    // Create result array
+    nlohmann::json result = nlohmann::json::array();
     for (const auto& [level, count] : level_counts) {
-        level_stats.push_back({
-            {"level", level},
-            {"count", count}
-        });
+        nlohmann::json level_stat;
+        level_stat["level"] = level;
+        level_stat["count"] = count;
+        result.push_back(level_stat);
     }
     
-    result["level_statistics"] = level_stats;
     return result;
 }
 
@@ -466,28 +301,51 @@ void handleClient(SOCKET clientSocket) {
             std::string log_folder = request.value("log_folder", "");
             std::string analysis_type = request.value("analysis_type", "");
             
-            std::cout << "Processing analysis request for " << log_folder << " (" << analysis_type << ")" << std::endl;
+            std::cout << "Analysis request for folder: " << log_folder << std::endl;
+            std::cout << "Folder exists: " << (std::filesystem::exists(log_folder) ? "Yes" : "No") << std::endl;
+
+            // If folder exists, list files:
+            if (std::filesystem::exists(log_folder)) {
+                std::cout << "Files in directory:" << std::endl;
+                for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
+                    std::cout << "  - " << entry.path().string() 
+                              << " (Extension: " << entry.path().extension().string() << ")" << std::endl;
+                }
+            }
+
+            // Load all log files from the folder
+            std::vector<ParsedLogEntry> all_logs;
+            for (const auto& entry : std::filesystem::directory_iterator(log_folder)) {
+                if (entry.path().extension() == ".json") {
+                    auto logs = parse_json_file(entry.path().string());
+                    all_logs.insert(all_logs.end(), logs.begin(), logs.end());
+                } 
+                else if (entry.path().extension() == ".txt") {
+                    auto logs = parse_txt_file(entry.path().string());
+                    all_logs.insert(all_logs.end(), logs.begin(), logs.end());
+                }
+            }
             
-            if (log_folder.empty() || analysis_type.empty()) {
-                response["status"] = "error";
-                response["message"] = "Missing log_folder or analysis_type";
-            }
+            // Perform requested analysis
+            if (analysis_type == "user") {
+                response["user_statistics"] = analyze_by_user(all_logs);
+                response["analysis_type"] = "user";
+            } 
+            else if (analysis_type == "ip") {
+                response["ip_statistics"] = analyze_by_ip(all_logs);
+                response["analysis_type"] = "ip";
+            } 
+            else if (analysis_type == "level") {
+                response["level_statistics"] = analyze_by_level(all_logs);
+                response["analysis_type"] = "level";
+            } 
             else {
-                // Perform requested analysis
-                if (analysis_type == "ip") {
-                    response = analyze_by_ip(log_folder);
-                }
-                else if (analysis_type == "user") {
-                    response = analyze_by_user(log_folder);
-                }
-                else if (analysis_type == "level") {
-                    response = analyze_by_level(log_folder);
-                }
-                else {
-                    response["status"] = "error";
-                    response["message"] = "Unsupported analysis type: " + analysis_type;
-                }
+                response["status"] = "error";
+                response["message"] = "Unknown analysis type: " + analysis_type;
+                return;
             }
+            
+            response["status"] = "success";
         }
         else {
             response["status"] = "error";
