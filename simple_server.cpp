@@ -154,6 +154,114 @@ std::vector<ParsedLogEntry> parse_txt_file(const std::string& filepath) {
     return entries;
 }
 
+/*
+// XML parser function
+// Note: This implementation is commented out as it requires the tinyxml2 library
+// Uncomment the following code if you want to enable XML parsing (TESTING ONLY, NOT CONSISTENT)
+std::vector<ParsedLogEntry> parse_xml_file(const std::string& filepath) {
+    std::vector<ParsedLogEntry> entries;
+    
+    // Load XML file
+    tinyxml2::XMLDocument doc;
+    tinyxml2::XMLError result = doc.LoadFile(filepath.c_str());
+    
+    if (result != tinyxml2::XML_SUCCESS) {
+        std::cerr << "Failed to load XML file: " << filepath << std::endl;
+        return entries;
+    }
+    
+    // Get root element
+    tinyxml2::XMLElement* root = doc.RootElement();
+    if (!root) {
+        std::cerr << "XML file has no root element" << std::endl;
+        return entries;
+    }
+    
+    // Check if root is "logs"
+    if (std::string(root->Name()) != "logs") {
+        std::cerr << "XML root element is not 'logs'" << std::endl;
+        return entries;
+    }
+    
+    // Iterate through log entries
+    int success_count = 0;
+    for (tinyxml2::XMLElement* logElement = root->FirstChildElement("log");
+         logElement;
+         logElement = logElement->NextSiblingElement("log")) {
+        
+        try {
+            ParsedLogEntry entry;
+            
+            // Parse timestamp
+            tinyxml2::XMLElement* timestampElement = logElement->FirstChildElement("timestamp");
+            if (timestampElement && timestampElement->GetText()) {
+                entry.timestamp = ParsedLogEntry::parse_timestamp(timestampElement->GetText());
+            } else {
+                // Default timestamp if not found
+                entry.timestamp = std::chrono::system_clock::now();
+            }
+            
+            // Parse username (might be user_id in some formats)
+            tinyxml2::XMLElement* userElement = logElement->FirstChildElement("username");
+            if (userElement && userElement->GetText()) {
+                entry.username = userElement->GetText();
+            } else {
+                // Try user_id instead
+                userElement = logElement->FirstChildElement("user_id");
+                if (userElement && userElement->GetText()) {
+                    entry.username = "user_" + std::string(userElement->GetText());
+                } else {
+                    entry.username = "unknown";
+                }
+            }
+            
+            // Parse IP address
+            tinyxml2::XMLElement* ipElement = logElement->FirstChildElement("ip_address");
+            if (ipElement && ipElement->GetText()) {
+                entry.ip_address = ipElement->GetText();
+            } else {
+                entry.ip_address = "0.0.0.0";
+            }
+            
+            // Parse log level
+            tinyxml2::XMLElement* levelElement = logElement->FirstChildElement("log_level");
+            if (levelElement && levelElement->GetText()) {
+                entry.log_level = levelElement->GetText();
+            } else {
+                entry.log_level = "INFO";
+            }
+            
+            // Parse message
+            tinyxml2::XMLElement* messageElement = logElement->FirstChildElement("message");
+            if (messageElement && messageElement->GetText()) {
+                entry.message = messageElement->GetText();
+            } else {
+                entry.message = "";
+            }
+            
+            // Parse response time (optional)
+            tinyxml2::XMLElement* rtElement = logElement->FirstChildElement("response_time");
+            if (rtElement && rtElement->GetText()) {
+                try {
+                    entry.response_time = std::stod(rtElement->GetText());
+                } catch (const std::exception&) {
+                    entry.response_time = 0.0;
+                }
+            }
+            
+            entries.push_back(entry);
+            success_count++;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error parsing XML log entry: " << e.what() << std::endl;
+        }
+    }
+    
+    std::cout << "Parsed " << success_count << " entries from XML file" << std::endl;
+    return entries;
+}
+*/
+
 // Analyze logs by IP address
 nlohmann::json analyze_by_ip(const std::string& log_folder) {
     nlohmann::json result;
@@ -297,65 +405,61 @@ void handleClient(SOCKET clientSocket) {
             std::string file_path = request.value("file_path", "");
             std::string file_type = request.value("file_type", "");
             
-            std::cout << "Processing parse request for " << file_path << " (" << file_type << ")" << std::endl;
+            std::vector<ParsedLogEntry> logs;
             
-            if (file_path.empty() || file_type.empty()) {
+            if (file_type == "json") {
+                logs = parse_json_file(file_path);
+            } 
+            else if (file_type == "txt") {
+                logs = parse_txt_file(file_path);
+            }
+            /*
+            // Uncomment to enable XML parsing
+            else if (file_type == "xml") {
+                logs = parse_xml_file(file_path);
+            }
+            */
+            else {
                 response["status"] = "error";
-                response["message"] = "Missing file path or type";
+                response["message"] = "Unsupported file type: " + file_type;
+            }
+            
+            // Create response with parsed entries
+            if (!logs.empty()) {
+                // Limit to 1000 entries max for transmission
+                const int MAX_ENTRIES_TO_SEND = 1000;
+                int entries_to_send = (logs.size() < MAX_ENTRIES_TO_SEND) ? logs.size() : MAX_ENTRIES_TO_SEND;
+
+                response["status"] = "success";
+                response["count"] = logs.size();  // Total count
+                response["sent_count"] = entries_to_send;  // How many we're actually sending
+
+                // Convert entries to JSON array
+                nlohmann::json entries_json = nlohmann::json::array();
+                for (int i = 0; i < entries_to_send; i++) {
+                    const auto& entry = logs[i];
+                    auto time_t_point = std::chrono::system_clock::to_time_t(entry.timestamp);
+                    std::tm tm = {};
+                    localtime_s(&tm, &time_t_point);
+                    char time_buf[80];
+                    strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm);
+                    
+                    nlohmann::json entry_json;
+                    entry_json["timestamp"] = time_buf;
+                    entry_json["username"] = entry.username;
+                    entry_json["ip_address"] = entry.ip_address;
+                    entry_json["log_level"] = entry.log_level;
+                    entry_json["message"] = entry.message;
+                    entry_json["response_time"] = entry.response_time;
+                    
+                    entries_json.push_back(entry_json);
+                }
+                
+                response["entries"] = entries_json;
             }
             else {
-                std::vector<ParsedLogEntry> entries;
-                
-                // Parse based on file type
-                if (file_type == "json") {
-                    entries = parse_json_file(file_path);
-                }
-                else if (file_type == "txt") {
-                    entries = parse_txt_file(file_path);
-                }
-                else {
-                    response["status"] = "error";
-                    response["message"] = "Unsupported file type: " + file_type;
-                    entries.clear();
-                }
-                
-                // Create response with parsed entries
-                if (!entries.empty()) {
-                    // Limit to 1000 entries max for transmission
-                    const int MAX_ENTRIES_TO_SEND = 1000;
-                    int entries_to_send = (entries.size() < MAX_ENTRIES_TO_SEND) ? entries.size() : MAX_ENTRIES_TO_SEND;
-
-                    response["status"] = "success";
-                    response["count"] = entries.size();  // Total count
-                    response["sent_count"] = entries_to_send;  // How many we're actually sending
-
-                    // Convert entries to JSON array
-                    nlohmann::json entries_json = nlohmann::json::array();
-                    for (int i = 0; i < entries_to_send; i++) {
-                        const auto& entry = entries[i];
-                        auto time_t_point = std::chrono::system_clock::to_time_t(entry.timestamp);
-                        std::tm tm = {};
-                        localtime_s(&tm, &time_t_point);
-                        char time_buf[80];
-                        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", &tm);
-                        
-                        nlohmann::json entry_json;
-                        entry_json["timestamp"] = time_buf;
-                        entry_json["username"] = entry.username;
-                        entry_json["ip_address"] = entry.ip_address;
-                        entry_json["log_level"] = entry.log_level;
-                        entry_json["message"] = entry.message;
-                        entry_json["response_time"] = entry.response_time;
-                        
-                        entries_json.push_back(entry_json);
-                    }
-                    
-                    response["entries"] = entries_json;
-                }
-                else {
-                    response["status"] = "error";
-                    response["message"] = "Failed to parse entries from file";
-                }
+                response["status"] = "error";
+                response["message"] = "Failed to parse entries from file";
             }
         }
         else if (request_type == "analysis") {

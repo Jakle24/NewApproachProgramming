@@ -19,7 +19,7 @@
 void printUsage() {
     std::cout << "Usage:\n";
     std::cout << "  For analysis: simple_client --analysis --log-folder <folder> --type <user|ip|level>\n";
-    std::cout << "  For parsing:  simple_client --parse --file <path> --type <json|txt>\n";
+    std::cout << "  For parsing:  simple_client --parse --file <path> --type <json|txt|xml>\n";
 }
 
 // Add to analyze log levels
@@ -55,24 +55,47 @@ void analyze_timestamps(const nlohmann::json& response) {
 
 // Add to analyze top active users
 void analyze_users(const nlohmann::json& response) {
-    std::map<std::string, int> user_counts;
-    
-    for (const auto& entry : response["entries"]) {
-        std::string username = entry["username"];
-        user_counts[username]++;
+    // Check if we have the expected fields
+    if (!response.contains("user_statistics")) {
+        std::cout << "Error: Response doesn't contain user statistics data\n";
+        return;
     }
     
-    std::cout << "\n=== Top 5 Active Users ===\n";
+    // If user_statistics is empty, report it
+    if (response["user_statistics"].empty()) {
+        std::cout << "\n=== No User Data Available ===\n";
+        std::cout << "The server returned no user statistics. This might be because:\n";
+        std::cout << "- No log files were found\n";
+        std::cout << "- The logs didn't contain user information\n";
+        std::cout << "- There was an error processing the logs\n";
+        return;
+    }
+    
+    // Process user statistics as returned by server
+    std::cout << "\n=== Top Active Users ===\n";
     
     // Create vector of pairs for sorting
-    std::vector<std::pair<std::string, int>> user_pairs(user_counts.begin(), user_counts.end());
-    std::sort(user_pairs.begin(), user_pairs.end(), 
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::vector<std::pair<std::string, int>> user_pairs;
     
-    int count = 0;
+    for (const auto& user_stat : response["user_statistics"]) {
+        if (user_stat.contains("username") && user_stat.contains("count")) {
+            std::string username = user_stat["username"];
+            int count = user_stat["count"];
+            user_pairs.push_back({username, count});
+        }
+    }
+    
+    // Sort by count (descending)
+    std::sort(user_pairs.begin(), user_pairs.end(), 
+              [](const auto& a, const auto& b) { 
+                  return a.second > b.second; 
+              });
+    
+    int displayed = 0;
     for (const auto& [user, entries] : user_pairs) {
-        if (count++ >= 5) break;
         std::cout << user << ": " << entries << " entries\n";
+        displayed++;
+        if (displayed >= 5) break; // Show top 5
     }
 }
 
