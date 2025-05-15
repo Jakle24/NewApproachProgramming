@@ -55,23 +55,18 @@ void analyze_timestamps(const nlohmann::json& response) {
 
 // Add to analyze top active users
 void analyze_users(const nlohmann::json& response) {
-    // Check if we have the expected fields
-    if (!response.contains("user_statistics")) {
-        std::cout << "Error: Response doesn't contain user statistics data\n";
-        return;
-    }
-    
-    // If user_statistics is empty, report it
+    // Handle empty array case
     if (response["user_statistics"].empty()) {
         std::cout << "\n=== No User Data Available ===\n";
-        std::cout << "The server returned no user statistics. This might be because:\n";
-        std::cout << "- No log files were found\n";
-        std::cout << "- The logs didn't contain user information\n";
-        std::cout << "- There was an error processing the logs\n";
+        std::cout << "The server returned no user statistics.\n";
+        std::cout << "This could be because:\n";
+        std::cout << "- No log files were found in the specified folder\n";
+        std::cout << "- Log files don't contain user information\n";
+        std::cout << "- There was a processing error on the server\n";
         return;
     }
     
-    // Process user statistics as returned by server
+    // Only proceed if we have data
     std::cout << "\n=== Top Active Users ===\n";
     
     // Create vector of pairs for sorting
@@ -99,6 +94,21 @@ void analyze_users(const nlohmann::json& response) {
     }
 }
 
+// Add to analyze IP statistics
+void analyze_ips(const nlohmann::json& response) {
+    std::map<std::string, int> ip_counts;
+    
+    for (const auto& entry : response["entries"]) {
+        std::string ip = entry["ip_address"];
+        ip_counts[ip]++;
+    }
+    
+    std::cout << "\n=== IP Address Analysis ===\n";
+    for (const auto& [ip, count] : ip_counts) {
+        std::cout << ip << ": " << count << " entries\n";
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         printUsage();
@@ -107,6 +117,7 @@ int main(int argc, char* argv[]) {
     
     std::string mode = argv[1];
     nlohmann::json request;
+    std::string analysisType;
     
     if (mode == "--analysis") {
         // Original analysis mode
@@ -116,7 +127,6 @@ int main(int argc, char* argv[]) {
         }
         
         std::string log_folder;
-        std::string analysis_type;
         
         for (int i = 2; i < argc; i += 2) {
             std::string arg = argv[i];
@@ -124,11 +134,11 @@ int main(int argc, char* argv[]) {
                 log_folder = argv[i + 1];
             } 
             else if (arg == "--type" && i + 1 < argc) {
-                analysis_type = argv[i + 1];
+                analysisType = argv[i + 1];
             }
         }
         
-        if (log_folder.empty() || analysis_type.empty()) {
+        if (log_folder.empty() || analysisType.empty()) {
             std::cout << "Missing required parameters\n";
             printUsage();
             return 1;
@@ -136,7 +146,7 @@ int main(int argc, char* argv[]) {
         
         request["request_type"] = "analysis";
         request["log_folder"] = log_folder;
-        request["analysis_type"] = analysis_type;
+        request["analysis_type"] = analysisType;
     }
     else if (mode == "--parse") {
         // New parsing mode
@@ -231,18 +241,36 @@ int main(int argc, char* argv[]) {
     nlohmann::json response = nlohmann::json::parse(total_response);
     
     if (mode == "--analysis") {
-        // Display analysis results
+        // Display the raw response first for debugging
         std::cout << "\n=== Analysis Results ===\n\n";
-        std::cout << response.dump(4) << std::endl;  // Pretty-print with 4-space indent
+        std::cout << response.dump(4) << std::endl;
 
-        // Analyze log levels
-        analyze_log_levels(response);
-
-        // Analyze timestamps
-        analyze_timestamps(response);
-
-        // Analyze top active users
-        analyze_users(response);
+        // Then process according to analysis type with proper error checks
+        if (response.contains("status") && response["status"] == "success") {
+            if (analysisType == "user") {
+                if (response.contains("user_statistics")) {
+                    analyze_users(response);
+                } else {
+                    std::cout << "Error: Response missing user_statistics field" << std::endl;
+                }
+            } else if (analysisType == "ip") {
+                if (response.contains("ip_statistics")) {
+                    analyze_ips(response);
+                } else {
+                    std::cout << "Error: Response missing ip_statistics field" << std::endl;
+                }
+            } else if (analysisType == "level") {
+                if (response.contains("level_statistics")) {
+                    analyze_log_levels(response);
+                } else {
+                    std::cout << "No level statistics available in response" << std::endl;
+                }
+            }
+        } else {
+            std::cout << "Error in analysis response: " 
+                      << (response.contains("message") ? response["message"].get<std::string>() : "Unknown error")
+                      << std::endl;
+        }
     }
     else if (mode == "--parse") {
         // Display parsing results
