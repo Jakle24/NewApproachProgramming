@@ -1,4 +1,21 @@
 Use compile_env.bat to navigate compilation process. Ensure regluar cleaning to make sure everything is updated upon use. 
+
+Use compile_env.bat to navigate compilation process. Ensure regluar cleaning to make sure everything is updated upon use. 
+
+## Log File Extraction
+1. Download the logs.zip file from the project repository or shared location
+2. Extract the contents using any archive tool:
+   ```
+   Right-click logs.zip > Extract All... 
+   ```
+   Or using PowerShell:
+   ```powershell
+   Expand-Archive -Path logs.zip -DestinationPath .\Logs
+   ```
+3. Ensure the logs are extracted to the "Logs" folder in the project root directory
+4. Verify the folder structure matches what's referenced in the commands (e.g., "Logs\logs\client#1\")
+
+
 Then use commands that direct to logfiles.
 
 **Sample Client Commands
