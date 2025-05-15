@@ -14,9 +14,6 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-// Constructor
-LogProcessor::LogProcessor(const std::string& log_folder) : log_folder(log_folder) {}
-
 // Helper: List files in the log directory
 std::vector<std::string> LogProcessor::get_log_files() {
     std::vector<std::string> files;
@@ -62,28 +59,91 @@ std::vector<LogEntry> LogProcessor::parse_json(const std::string& filepath) {
         nlohmann::json j;
         file >> j;
         
-        if (!j.contains("logs") || !j["logs"].is_array()) {
-            std::cerr << "Invalid JSON structure in " << filepath << std::endl;
-            return entries;
-        }
-        
-        for (const auto& log : j["logs"]) {
-            if (log.contains("username") && log.contains("ip_address") &&
-                log.contains("log_level") && log.contains("timestamp")) {
+        // Handle single object format
+        if (!j.is_array() && !j.contains("logs")) {
+            // Process as a single log entry
+            if (j.contains("username") && j.contains("ip_address") &&
+                j.contains("log_level") && j.contains("timestamp")) {
                 
                 LogEntry entry;
-                entry.timestamp = LogEntry::parse_timestamp(log["timestamp"]);
-                entry.username = log["username"];
-                entry.ip_address = log["ip_address"];
-                entry.log_level = log["log_level"];
-                entry.message = log.value("message", "");
-                entry.response_time = log.value("response_time", 0.0);
+                entry.timestamp = LogEntry::parse_timestamp(j["timestamp"]);
+                if (j.contains("user_id")) {
+                    // Convert user_id to string
+                    entry.username = "user_" + std::to_string(j["user_id"].get<int>());
+                } else if (j.contains("username")) {
+                    entry.username = j["username"].get<std::string>();
+                } else {
+                    entry.username = "unknown";
+                }
+                entry.ip_address = j["ip_address"];
+                entry.log_level = j["log_level"];
+                entry.message = j.value("message", "");
+                entry.response_time = j.value("response_time", 0.0);
                 
                 entries.push_back(entry);
+                std::cout << "Successfully parsed single JSON log entry" << std::endl;
+                return entries;
             }
         }
         
-        std::cout << "Successfully parsed " << entries.size() << " logs from JSON file" << std::endl;
+        // Handle array inside "logs" property
+        if (j.contains("logs") && j["logs"].is_array()) {
+            for (const auto& log : j["logs"]) {
+                if (log.contains("username") && log.contains("ip_address") &&
+                    log.contains("log_level") && log.contains("timestamp")) {
+                    
+                    LogEntry entry;
+                    entry.timestamp = LogEntry::parse_timestamp(log["timestamp"]);
+                    if (log.contains("user_id")) {
+                        // Convert user_id to string
+                        entry.username = "user_" + std::to_string(log["user_id"].get<int>());
+                    } else if (log.contains("username")) {
+                        entry.username = log["username"].get<std::string>();
+                    } else {
+                        entry.username = "unknown";
+                    }
+                    entry.ip_address = log["ip_address"];
+                    entry.log_level = log["log_level"];
+                    entry.message = log.value("message", "");
+                    entry.response_time = log.value("response_time", 0.0);
+                    
+                    entries.push_back(entry);
+                }
+            }
+            
+            std::cout << "Successfully parsed " << entries.size() << " logs from JSON file" << std::endl;
+        }
+        
+        // Handle direct array format (if needed)
+        else if (j.is_array()) {
+            for (const auto& log : j) {
+                if (log.contains("username") && log.contains("ip_address") &&
+                    log.contains("log_level") && log.contains("timestamp")) {
+                    
+                    LogEntry entry;
+                    entry.timestamp = LogEntry::parse_timestamp(log["timestamp"]);
+                    if (log.contains("user_id")) {
+                        // Convert user_id to string
+                        entry.username = "user_" + std::to_string(log["user_id"].get<int>());
+                    } else if (log.contains("username")) {
+                        entry.username = log["username"].get<std::string>();
+                    } else {
+                        entry.username = "unknown";
+                    }
+                    entry.ip_address = log["ip_address"];
+                    entry.log_level = log["log_level"];
+                    entry.message = log.value("message", "");
+                    entry.response_time = log.value("response_time", 0.0);
+                    
+                    entries.push_back(entry);
+                }
+            }
+            
+            std::cout << "Successfully parsed " << entries.size() << " logs from JSON array" << std::endl;
+        }
+        else {
+            std::cerr << "Invalid JSON structure in " << filepath << std::endl;
+        }
     }
     catch (const std::exception& e) {
         std::cerr << "Error parsing JSON file " << filepath << ": " << e.what() << std::endl;
@@ -261,14 +321,14 @@ std::vector<LogEntry> LogProcessor::process_logs_parallel(const std::optional<Da
 nlohmann::json LogProcessor::calculate_statistics(const std::vector<double>& values) {
     nlohmann::json stats;
     
-    if (values.empty()) {
-        stats["count"] = 0;
-        stats["min"] = 0;
-        stats["max"] = 0;
-        stats["average"] = 0;
-        stats["median"] = 0;
-        return stats;
-    }
+if (values.empty()) {
+    stats["count"] = 0;
+    stats["min"] = 0;
+    stats["max"] = 0;
+    stats["average"] = 0;
+    stats["median"] = 0;
+    return stats;
+}
     
     // Calculate statistics
     stats["count"] = values.size();
@@ -367,7 +427,7 @@ nlohmann::json LogProcessor::analyze_by_level(const std::optional<DateRange>& da
     auto logs = process_logs_parallel(date_range);
     nlohmann::json result;
     
-    // Count logs per level
+    // Count logs per log level
     std::map<std::string, int> level_counts;
     std::map<std::string, std::vector<double>> response_times;
     
@@ -382,7 +442,7 @@ nlohmann::json LogProcessor::analyze_by_level(const std::optional<DateRange>& da
     nlohmann::json levels = nlohmann::json::array();
     for (const auto& [level, count] : level_counts) {
         nlohmann::json level_data;
-        level_data["level"] = level;
+        level_data["log_level"] = level;
         level_data["count"] = count;
         
         if (!response_times[level].empty()) {
@@ -393,6 +453,7 @@ nlohmann::json LogProcessor::analyze_by_level(const std::optional<DateRange>& da
     }
     
     result["log_levels"] = levels;
+    result["total_levels"] = levels.size();
     result["total_logs"] = logs.size();
     
     return result;

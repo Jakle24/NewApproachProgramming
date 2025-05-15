@@ -1,114 +1,57 @@
-Log Analysis System
-A multi-threaded C++ server-client application for processing and analyzing log files.
+Use compile_env.bat to navigate compilation process. Ensure regluar cleaning to make sure everything is updated upon use. 
 
-Setup Instructions
+Use compile_env.bat to navigate compilation process. Ensure regluar cleaning to make sure everything is updated upon use. 
 
-
-Prerequisites
-
-Windows OS
-Visual Studio C++ Build Tools (MSVC compiler)
-LogFiles.zip containing your log data
-
-Quick Start
-1. Clone the repository
-
-git clone https://github.com/yourusername/NewApproachProgramming.git
-cd NewApproachProgramming
-
-2. Place log files
-
-Download LogFiles.zip
-Place it in the project root directory
-Extract using the included script:
-
-extract_logs.bat
-
-3. Build the application
-
-Open a Developer Command Prompt for Visual Studio
-Run:
-
-cl /EHsc /std:c++17 src\*.cpp ws2_32.lib /I. /Fe:NewApproachProgramming.exe
-
-4. Run the server
-
-NewApproachProgramming.exe server
-
-5. Run the client (in a separate terminal)
-
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user
+## Log File Extraction
+1. Download the logs.zip file from the project repository or shared location
+2. Extract the contents using any archive tool:
+   ```
+   Right-click logs.zip > Extract All... 
+   ```
+   Or using PowerShell:
+   ```powershell
+   Expand-Archive -Path logs.zip -DestinationPath .\Logs
+   ```
+3. Ensure the logs are extracted to the "Logs" folder in the project root directory
+4. Verify the folder structure matches what's referenced in the commands (e.g., "Logs\logs\client#1\")
 
 
-Available Analysis Types
+Then use commands that direct to logfiles.
 
-user - Analyze logs by username
-ip - Analyze logs by IP address
-level - Analyze logs by severity level
+**Sample Client Commands
 
+## Basic Parsing Commands
 
-Command Examples
+# Parse JSON log file
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.json" --type json
 
-# User analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user
+# Parse TXT log file
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.txt" --type txt
 
-# IP analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis ip
-
-# Log level analysis
-NewApproachProgramming.exe client --log-folder LogFiles --analysis level
-
-# With date filtering
-NewApproachProgramming.exe client --log-folder LogFiles --analysis user --start "2023-01-01 00:00:00" --end "2023-12-31 23:59:59"
+# Parse logs from different clients
+.\simple_client.exe --parse --file "Logs\logs\client#2\log_file.json" --type json
+.\simple_client.exe --parse --file "Logs\logs\client#3\log_file.txt" --type txt
 
 
+## Analysis Commands (When Implemented)
 
-Project Structure
-src - Source code files
-LogFiles - Extracted log files for analysis
-nlohmann - JSON library for C++
-extract_logs.bat - Script to extract log files from zip
+# Analyze logs by user activity
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type user
 
+# Analyze logs by IP address
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type ip
 
-Troubleshooting
-Ensure you're using the Visual Studio Developer Command Prompt when building
-Verify that LogFiles.zip has been extracted correctly
-Start the server before running any client commands
+# Analyze logs by severity level
+.\simple_client.exe --analysis --log-folder "Logs\logs" --type level
 
 
+## Advanced Usage
 
+# Analyze specific client's logs
+.\simple_client.exe --analysis --log-folder "Logs\logs\client#1" --type user
 
+# Parse custom log file
+.\simple_client.exe --parse --file "path\to\your\custom_log.json" --type json
 
-QUICK USE
-
-Client Mode
-The client mode is used for analyzing log files with several required and optional parameters:
-
-Basic Usage
-
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
-
-
-Analysis Types
-You can specify one of three analysis types:
-
-# For user-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user
-
-# For IP-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis ip
-
-# For level-based analysis
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis level
-
-Date Filtering
-To analyze logs within a specific date range:
-
-.\NewApproachProgramming.exe client --log-folder "C:\Logs" --analysis user --start "2025-05-01 00:00:00" --end "2025-05-14 23:59:59"
-
-
-Tips
-Use quotes around folder paths that contain spaces
-Date format must be 'YYYY-MM-DD HH:MM:SS'
-You can use just the start date without the end date (or vice versa)
-Make sure the log folder path points to a directory containing valid log files
+# Run with output redirection to save results
+.\simple_client.exe --parse --file "Logs\logs\client#1\log_file.json" --type json > results.txt

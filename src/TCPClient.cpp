@@ -81,3 +81,30 @@ nlohmann::json TCPClient::send_request(const nlohmann::json& request) {
         return {{"error", "Failed to parse server response"}};
     }
 }
+
+void TCPClient::start() {
+    std::string analysis_type;
+    std::string start_date, end_date;
+
+    std::cout << "Enter analysis type (user/ip/level): ";
+    std::getline(std::cin, analysis_type);
+
+    std::cout << "Enter start date (YYYY-MM-DD HH:MM:SS) or leave empty: ";
+    std::getline(std::cin, start_date);
+    std::cout << "Enter end date (YYYY-MM-DD HH:MM:SS) or leave empty: ";
+    std::getline(std::cin, end_date);
+
+    json request = {
+        {"analysis_type", analysis_type},
+        {"log_folder", "LogFiles"}
+    };
+
+    if (!start_date.empty() && !end_date.empty()) {
+        request["start_date"] = start_date;
+        request["end_date"] = end_date;
+    }
+
+    json response = send_request(request);
+
+    std::cout << "\nServer response:\n" << response.dump(4) << "\n";
+}

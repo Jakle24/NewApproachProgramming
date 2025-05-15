@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "${workspaceFolder}\\compile_env.bat && cl /EHsc /std:c++17 src\\*.cpp ws2_32.lib /I\"include\" /Fe:LogAnalysis.exe",
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/c"]
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "run-server",
+            "type": "shell",
+            "command": "${workspaceFolder}\\LogAnalysis.exe server",
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/c"]
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "dependsOn": ["build"]
+        },
+        {
+            "label": "run-client-user",
+            "type": "shell",
+            "command": "${workspaceFolder}\\LogAnalysis.exe client --log-folder TestLog --analysis user",
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/c"]
+                }
+            },
+            "dependsOn": ["build"]
+        }
+    ]
+}

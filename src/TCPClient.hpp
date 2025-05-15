@@ -15,7 +15,9 @@
  */
 class TCPClient {
 public:
+void start();
     /**
+     * void
      * @brief Constructs a client that connects to the specified server
      * @param server_ip IP address of the server (default: localhost)
      * @param server_port TCP port of the server (default: 8080)
